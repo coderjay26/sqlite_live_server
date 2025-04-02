@@ -4,7 +4,6 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import 'sqlite_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class WebServer {
   final SQLiteService dbService;
@@ -34,13 +33,8 @@ class WebServer {
       return Response.ok(_htmlPage, headers: {'Content-Type': 'text/html'});
     });
 
-    _server = await io.serve(router, 'localhost', 8080);
+    _server = await io.serve(router, 'localhost', 8080); // Host on the device
     print('Server running at http://localhost:8080');
-
-    final url = 'http://localhost:8080';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    }
   }
 
   Future<void> stopServer() async {
