@@ -9,7 +9,7 @@ class SQLiteService {
 
   Future<void> initDatabase(String dbName) async {
     Directory appDir = await getApplicationDocumentsDirectory();
-    _databasePath = join(appDir.path, dbName);
+    _databasePath = join(await getDatabasesPath(), dbName);
   }
 
   Future<Database> get database async {

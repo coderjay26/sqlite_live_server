@@ -20,6 +20,7 @@ dependencies:
   url_launcher:
   path:
   network_info_plus:
+  get_ip_address:
 dev_dependencies:
   flutter_test:
     sdk: flutter
