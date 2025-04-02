@@ -13,9 +13,12 @@ dependencies:
   sqflite:
   shelf:
   shelf_web_socket:
+  shelf_router:
+  shelf_static:
   web_socket_channel:
   path_provider:
   url_launcher:
+  path:
 dev_dependencies:
   flutter_test:
     sdk: flutter
