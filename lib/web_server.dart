@@ -45,7 +45,7 @@ class WebServer {
     // Listen on all network interfaces (0.0.0.0 means all available interfaces)
     var server = await io.serve(handler, InternetAddress.anyIPv4, 8080);
     print(
-        'Server running at http://$ipAddress:8080'); // Print the device IP address
+        '\x1B[32mServer running at http://$ipAddress:8080\x1B[0m'); // Print the device IP address
   }
 
   Future<void> stopServer() async {
