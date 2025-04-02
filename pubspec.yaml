@@ -19,6 +19,7 @@ dependencies:
   path_provider:
   url_launcher:
   path:
+  network_info_plus:
 dev_dependencies:
   flutter_test:
     sdk: flutter

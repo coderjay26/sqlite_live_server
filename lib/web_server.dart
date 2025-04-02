@@ -1,8 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
+import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:network_info_plus/network_info_plus.dart'; // Import this
 import 'sqlite_service.dart';
 
 class WebServer {
@@ -12,14 +13,19 @@ class WebServer {
   WebServer(this.dbService);
 
   Future<void> startServer() async {
+    // Get the IP address of the device
+    String? ipAddress = await _getDeviceIP();
+
     var router = Router();
 
+    // Endpoint to get the list of tables
     router.get('/tables', (Request request) async {
       var tables = await dbService.getTables();
       return Response.ok(jsonEncode(tables),
           headers: {'Content-Type': 'application/json'});
     });
 
+    // Endpoint to run SQL queries
     router.get('/query', (Request request) async {
       final sql = request.url.queryParameters['sql'];
       if (sql == null)
@@ -29,17 +35,31 @@ class WebServer {
           headers: {'Content-Type': 'application/json'});
     });
 
+    // Root endpoint to serve the HTML page
     router.get('/', (Request request) {
       return Response.ok(_htmlPage, headers: {'Content-Type': 'text/html'});
     });
 
-    _server = await io.serve(router, 'localhost', 8080); // Host on the device
-    print('Server running at http://localhost:8080');
+    var handler = const Pipeline()
+        .addMiddleware(logRequests())
+        .addHandler(router.handler);
+
+    // Listen on all network interfaces (0.0.0.0 means all available interfaces)
+    var server = await io.serve(handler, InternetAddress.anyIPv4, 8080);
+    print(
+        'Server running at http://$ipAddress:8080'); // Print the device IP address
   }
 
   Future<void> stopServer() async {
     await _server?.close();
     print('Server stopped.');
+  }
+
+  // Function to get the IP address of the device
+  Future<String?> _getDeviceIP() async {
+    final info = NetworkInfo();
+    String? ip = await info.getIpAddress();
+    return ip ?? 'Unable to get IP'; // Return the IP or a fallback message
   }
 
   static const String _htmlPage = '''
