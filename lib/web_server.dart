@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:get_ip_address/get_ip_address.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart'; // Import this
@@ -14,9 +13,8 @@ class WebServer {
 
   Future<void> startServer() async {
     // Get the IP address of the device
-    // String? ipAddress = await _getLocalIPAddress();
-    var ip = IpAddress(type: RequestType.json);
-    String? ipAddress = await ip.getIpAddress();
+    String? ipAddress = await _getLocalIPAddress();
+
     var router = Router();
 
     // Endpoint to get the list of tables
@@ -59,9 +57,13 @@ class WebServer {
     try {
       for (var interface in await NetworkInterface.list()) {
         for (var addr in interface.addresses) {
-          if (addr.address.contains(".")) {
-            // Get IPv4 address
-
+          print('Interface: ${interface.name}');
+          print('Address: ${addr.address}');
+          print('Type: ${addr.type}');
+          if (addr.type == InternetAddressType.IPv4 &&
+              !addr.isLoopback &&
+              interface.name == 'wlan0') {
+            print('Local IP Address: ${addr.address}');
             return addr.address;
           }
         }
@@ -292,6 +294,7 @@ class WebServer {
       function selectTable() {
         let table = document.getElementById("tables").value;
         document.getElementById("query").value = 'SELECT * FROM ' + table;
+        runQuery();
       }
 
       // Ensure the loadTables function is called once the page is fully loaded
