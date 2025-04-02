@@ -100,6 +100,10 @@ class WebServer {
       border-radius: 5px;
       border: 1px solid #ccc;
     }
+    textarea {
+      min-height: 100px; /* Adjust this value as needed */
+      resize: vertical; /* Allows user to resize the textarea */
+    }
     button {
       padding: 10px;
       background-color: #3498db;
@@ -270,8 +274,6 @@ function displayTable(data) {
   tableHtml += '</tbody></table></div>';
   document.getElementById("output").innerHTML = tableHtml;
 }
-
-
     function highlightRow(row) {
       let rows = document.querySelectorAll("tr");
       rows.forEach(r => r.classList.remove("selected"));
