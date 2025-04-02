@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
-import 'package:shelf_router/shelf_router.dart'; // Import this
+import 'package:shelf_router/shelf_router.dart';
 import 'sqlite_service.dart';
 
 class WebServer {
@@ -12,29 +12,38 @@ class WebServer {
   WebServer(this.dbService);
 
   Future<void> startServer() async {
-    // Get the IP address of the device
     String? ipAddress = await _getLocalIPAddress();
 
     var router = Router();
 
-    // Endpoint to get the list of tables
+    // Get the list of tables
     router.get('/tables', (Request request) async {
       var tables = await dbService.getTables();
       return Response.ok(jsonEncode(tables),
           headers: {'Content-Type': 'application/json'});
     });
 
-    // Endpoint to run SQL queries
+    // Run SQL queries
     router.get('/query', (Request request) async {
       final sql = request.url.queryParameters['sql'];
-      if (sql == null)
-        return Response.badRequest(body: 'SQL query is required');
-      var data = await dbService.query(sql);
-      return Response.ok(jsonEncode(data),
-          headers: {'Content-Type': 'application/json'});
+      if (sql == null) {
+        return Response.badRequest(
+            body: jsonEncode({'error': 'SQL query is required'}),
+            headers: {'Content-Type': 'application/json'});
+      }
+
+      try {
+        var data = await dbService.query(sql);
+        return Response.ok(jsonEncode({'data': data, 'rowCount': data.length}),
+            headers: {'Content-Type': 'application/json'});
+      } catch (e) {
+        return Response.internalServerError(
+            body: jsonEncode({'error': e.toString()}),
+            headers: {'Content-Type': 'application/json'});
+      }
     });
 
-    // Root endpoint to serve the HTML page
+    // Serve HTML
     router.get('/', (Request request) {
       return Response.ok(_htmlPage, headers: {'Content-Type': 'text/html'});
     });
@@ -42,10 +51,8 @@ class WebServer {
     var handler =
         const Pipeline().addMiddleware(logRequests()).addHandler(router);
 
-    // Listen on all network interfaces (0.0.0.0 means all available interfaces)
     var server = await io.serve(handler, InternetAddress.anyIPv4, 8080);
-    print(
-        '\x1B[32mServer running at http://$ipAddress:8080\x1B[0m'); // Print the device IP address
+    print('\x1B[32mServer running at http://$ipAddress:8080\x1B[0m');
   }
 
   Future<void> stopServer() async {
@@ -57,250 +64,229 @@ class WebServer {
     try {
       for (var interface in await NetworkInterface.list()) {
         for (var addr in interface.addresses) {
-          print('Interface: ${interface.name}');
-          print('Address: ${addr.address}');
-          print('Type: ${addr.type}');
           if (addr.type == InternetAddressType.IPv4 &&
               !addr.isLoopback &&
               interface.name == 'wlan0') {
-            print('Local IP Address: ${addr.address}');
             return addr.address;
           }
         }
       }
     } catch (e) {
-      // ipAddress = "Failed to get IP";
-      print('Server stopped.');
+      print('Error getting IP address: $e');
     }
   }
 
   static const String _htmlPage = '''
 <html>
-  <head>
-    <title>SQLite Browser</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        background-color: #f4f6f9;
-        height: 100vh;
-        overflow: hidden;
-      }
-      h1 {
-        color: #2c3e50;
-      }
-      .container {
-        max-width: 100%;
-        max-height: 100%;
-        margin: 0;
-        padding: 20px;
-        background-color: #ffffff;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
-      }
-      .output-container {
-        max-height: 400px;
-        overflow: auto;
-      }
+<head>
+  <title>SQLite Browser</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+    }
+    h1 { color: #2c3e50; }
+    .container {
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    textarea, select {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #2980b9; }
+    .loading {
+      display: none;
+      color: #3498db;
+      font-style: italic;
+    }
+    .error {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+html, body {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
 
-      textarea {
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        margin: 10px 0;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-        resize: vertical;
-      }
-      button {
-        padding: 10px 15px;
-        font-size: 16px;
-        background-color: #3498db;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-      }
-      button:hover {
-        background-color: #2980b9;
-      }
-      select {
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        margin: 10px 0;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-      }
-      pre {
-        background-color: #ecf0f1;
-        padding: 15px;
-        border-radius: 5px;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        font-family: monospace;
-      }
-      table {
-        width: 100%;
-        height: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-        overflow-y: auto;
-        display: block;
-        table-layout: fixed;
-      }
-      thead {
-        position: sticky;
-        top: 0;
-        background-color: #3498db;
-        z-index: 10;
-      }
-      table, th, td {
-        border: 1px solid #ddd;
-      }
-      th, td {
-        padding: 10px;
-        text-align: left;
-        max-width: 200px;  /* Limit column width */
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      th {
-       position: sticky;
-       top: 0;
-       background-color: #3498db;
-       z-index: 10;
-       color: white;
-      }
-      td {
-        background-color: #f9f9f9;
-        cursor: pointer;
-      }
-      td:hover {
-        background-color: #e1e1e1;
-      }
-      .tooltip {
-        display: none;
-        position: absolute;
-        background-color: #333;
-        color: white;
-        padding: 5px;
-        border-radius: 3px;
-        font-size: 14px;
-        max-width: 300px;
-        white-space: normal;
-        word-wrap: break-word;
-        z-index: 9999;
-      }
-      .no-data {
-        color: #e74c3c;
-        font-style: italic;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>SQLite Browser</h1>
+.container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 
-      <label for="tables">Select a Table:</label>
-      <select id="tables" onchange="selectTable()">
-        <option value="">-- Select a table --</option>
-      </select>
+#output {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
-      <br><br>
+.table-wrapper {
+  flex: 1;
+  overflow-y: auto; /* Enables vertical scrolling */
+  overflow-x: auto; /* Enables horizontal scrolling */
+  border: 1px solid #ddd;
+  max-height: calc(100vh - 250px); /* Adjust based on header size */
+}
 
-      <label for="query">SQL Query:</label>
-      <textarea id="query" rows="6" placeholder="Write your SQL query here..."></textarea>
+table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap; /* Prevents text wrapping */
+}
 
-      <br><br>
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-      <button onclick="runQuery()">Run Query</button>
+th {
+  position: sticky;
+  top: 0;
+  background-color: #3498db;
+  color: white;
+  z-index: 2;
+}
 
-      <br><br>
+tr:hover {
+  background-color: #f1f1f1;
+}
 
-      <div class="output-container">
-        <h3>Query Result:</h3>
-        <div id="output"></div> <!-- Results will be shown as a table here -->
-      </div>
+.selected {
+  background-color: #f9eb3b !important;
+}
 
-      <!-- Tooltip container -->
-      <div id="tooltip" class="tooltip"></div>
-    </div>
+td:hover {
+  overflow: visible;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+td[title] {
+  cursor: help;
+}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SQLite Browser</h1>
+    <label for="tables">Select a Table:</label>
+    <select id="tables" onchange="selectTable()">
+      <option value="">-- Select a table --</option>
+    </select>
+    <textarea id="query" rows="4" placeholder="Write your SQL query here..."></textarea>
+    <button onclick="runQuery()">Run Query</button>
+    <p class="loading" id="loading">Loading...</p>
+    <p class="error" id="error"></p>
+    <p><strong>Rows Found:</strong> <span id="rowCount">0</span></p>
+    <div id="output"></div>
+  </div>
+
   <script>
-      // Fetch and display available tables from the database
-      async function loadTables() {
-        let response = await fetch('/tables');
-        let tables = await response.json();
-        const tablesSelect = document.getElementById("tables");
-        let optionsHtml = '';
-        for (let i = 0; i < tables.length; i++) {
-          optionsHtml += '<option value="' + tables[i] + '">' + tables[i] + '</option>';
-        }
-        tablesSelect.innerHTML = optionsHtml;
-      }
+    async function loadTables() {
+      let response = await fetch('/tables');
+      let tables = await response.json();
+      let tablesSelect = document.getElementById("tables");
+      tablesSelect.innerHTML = '<option value="">-- Select a table --</option>';
+      tables.forEach(table => {
+        tablesSelect.innerHTML += '<option value="' + table + '">' + table + '</option>';
+      });
+    }
 
-      // Run a SQL query entered in the textarea and display the result
-      async function runQuery() {
-        let sql = document.getElementById("query").value;
+    async function runQuery() {
+      let sql = document.getElementById("query").value;
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("error").textContent = "";
+      document.getElementById("output").innerHTML = "";
+
+      try {
         let response = await fetch('/query?sql=' + encodeURIComponent(sql));
-        let data = await response.json();
-        
-        // Display the result as a table
-        displayTable(data);
-      }
-      // Display the result as a table  
-      function displayTable(data) {
-        let tableHtml = '';
-        if (data.length > 0) {
-          let headers = Object.keys(data[0]);
-          tableHtml += '<table><thead><tr>';
-          for (let i = 0; i < headers.length; i++) {
-            tableHtml += '<th>' + headers[i] + '</th>';
-          }
-          tableHtml += '</tr></thead><tbody>';
+        let result = await response.json();
 
-          // Create table rows
-          for (let i = 0; i < data.length; i++) {
-            tableHtml += '<tr>';
-            for (let j = 0; j < headers.length; j++) {
-              tableHtml += '<td onmouseover="showTooltip(event, this.innerText)" onmouseout="hideTooltip()">' + data[i][headers[j]] + '</td>';
-            }
-            tableHtml += '</tr>';
-          }
-          tableHtml += '</tbody></table>';
-        } else {
-          tableHtml = '<p class="no-data">No data found</p>';
+        document.getElementById("loading").style.display = "none";
+
+        if (result.error) {
+          document.getElementById("error").textContent = "Error: " + result.error;
+          return;
         }
 
-        document.getElementById("output").innerHTML = tableHtml;
+        document.getElementById("rowCount").textContent = result.rowCount;
+        displayTable(result.data);
+      } catch (error) {
+        document.getElementById("error").textContent = "Error fetching data.";
+        document.getElementById("loading").style.display = "none";
       }
+    }
 
-      function showTooltip(event, text) {
-        let tooltip = document.getElementById("tooltip");
-        tooltip.innerHTML = text;
-        tooltip.style.display = "block";
-        tooltip.style.left = event.pageX + 10 + "px";
-        tooltip.style.top = event.pageY + 10 + "px";
-      }
+function displayTable(data) {
+  if (data.length === 0) {
+    document.getElementById("output").innerHTML = "<p>No data found.</p>";
+    return;
+  }
 
-      function hideTooltip() {
-        let tooltip = document.getElementById("tooltip");
-        tooltip.style.display = "none";
-      }
+  let headers = Object.keys(data[0]);
+  let tableHtml = '<div class="table-wrapper"><table><thead><tr>';
+  
+  headers.forEach(header => {
+    tableHtml += '<th>' + header + '</th>';
+  });
+  tableHtml += '</tr></thead><tbody>';
 
-      // Display the selected table data in the textarea
-      function selectTable() {
-        let table = document.getElementById("tables").value;
-        document.getElementById("query").value = 'SELECT * FROM ' + table;
-        runQuery();
-      }
+  data.forEach(row => {
+    tableHtml += '<tr onclick="highlightRow(this)">';
+    headers.forEach(header => {
+      let value = row[header] ?? ''; // Handle null values
+      let displayValue = value.toString().length > 20 ? value.toString().substring(0, 20) + '...' : value;
+      
+      let tooltip = value.toString().length > 20 ? ' title="' + value.toString().replace(/"/g, '&quot;') + '"' : '';
 
-      // Ensure the loadTables function is called once the page is fully loaded
-      window.onload = loadTables;
-    </script>
-  </body>
+      tableHtml += '<td' + tooltip + '>' + displayValue + '</td>';
+    });
+    tableHtml += '</tr>';
+  });
+
+  tableHtml += '</tbody></table></div>';
+  document.getElementById("output").innerHTML = tableHtml;
+}
+
+
+    function highlightRow(row) {
+      let rows = document.querySelectorAll("tr");
+      rows.forEach(r => r.classList.remove("selected"));
+      row.classList.add("selected");
+    }
+
+    function selectTable() {
+      let table = document.getElementById("tables").value;
+      document.getElementById("query").value = 'SELECT * FROM ' + table;
+      runQuery();
+    }
+
+    window.onload = loadTables;
+  </script>
+</body>
 </html>
 ''';
 }
