@@ -261,12 +261,12 @@ function displayTable(data) {
   data.forEach(row => {
     tableHtml += '<tr onclick="highlightRow(this)">';
     headers.forEach(header => {
-      let value = row[header] ?? ''; // Handle null values
+      let value = row[header] ?? '<i>NULL</i>'; // add this in the package
       let displayValue = value.toString().length > 20 ? value.toString().substring(0, 20) + '...' : value;
       
       let tooltip = value.toString().length > 20 ? ' title="' + value.toString().replace(/"/g, '&quot;') + '"' : '';
 
-      tableHtml += '<td' + tooltip + '>' + displayValue + '</td>';
+      tableHtml += '<td data-full-value="' + value + '" data-field="' + header + '" data-id="' + row.id + '" ondblclick="makeEditable(event)"' + tooltip + '>' + displayValue + '</td>';
     });
     tableHtml += '</tr>';
   });
@@ -285,7 +285,31 @@ function displayTable(data) {
       document.getElementById("query").value = 'SELECT * FROM ' + table;
       runQuery();
     }
+/// Add this in the package
+        function makeEditable(event) {
+            let td = event.target;
+            let oldValue = td.getAttribute("data-full-value") || td.textContent;
+            let input = document.createElement("input");
+            input.type = "text";
+            input.value = oldValue;
+            input.onblur = function () {
+                closeInput(td, input);  // Close input when blur event occurs
+            };
+            input.onkeydown = function (e) {
+                if (e.key === "Enter") {
+                    closeInput(td, input);  // Close input when Enter key is pressed
+                }
+            };
+            td.textContent = "";
+            td.appendChild(input);
+            input.focus();
+        }
 
+        /// Add this in the package
+        function closeInput(td, input) {
+            // Just revert back to the previous value and remove the input field
+            td.textContent = td.getAttribute("data-full-value") || td.textContent;
+        }
     window.onload = loadTables;
   </script>
 </body>
