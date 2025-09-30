@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
@@ -74,6 +75,14 @@ class WebServer {
   Middleware _corsMiddleware() {
     return (Handler handler) {
       return (Request request) async {
+        if (request.method == 'OPTIONS') {
+          return Response.ok('', headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
+          });
+        }
+        
         final response = await handler(request);
         return response.change(headers: {
           'Access-Control-Allow-Origin': '*',
@@ -149,7 +158,7 @@ class WebServer {
 
   Future<Response> _executeSqlQuery(String? sql) async {
     if (sql == null || sql.isEmpty) {
-      return Response.badRequest(body: 'SQL query is required');
+      return Response.badRequest(body: jsonEncode({'error': 'SQL query is required'}));
     }
 
     try {
@@ -265,6 +274,16 @@ class WebServer {
 
   void _sendTableUpdates(WebSocketChannel webSocket) async {
     // Implementation for real-time table updates
+    try {
+      final tables = await dbService.getTables();
+      webSocket.sink.add(jsonEncode({
+        'type': 'tables_updated',
+        'tables': tables,
+        'timestamp': DateTime.now().toIso8601String()
+      }));
+    } catch (e) {
+      webSocket.sink.add(jsonEncode({'error': e.toString()}));
+    }
   }
 
   void _executeQueryAndSend(WebSocketChannel webSocket, String sql) async {
@@ -390,7 +409,6 @@ class WebServer {
     <title>SQLite Pro - Advanced Database Manager</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Add the enhanced CSS from the previous beautiful version here */
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -421,113 +439,352 @@ class WebServer {
             display: flex;
             min-height: 100vh;
         }
-    h1 { color: #2c3e50; }
-    .container {
-      padding: 20px;
-      background-color: #fff;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-    textarea, select {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      margin: 10px 0;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    textarea {
-      min-height: 100px; /* Adjust this value as needed */
-      resize: vertical; /* Allows user to resize the textarea */
-    }
-    button {
-      padding: 10px;
-      background-color: #3498db;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover { background-color: #2980b9; }
-    .loading {
-      display: none;
-      color: #3498db;
-      font-style: italic;
-    }
-    .error {
-      color: #e74c3c;
-      font-weight: bold;
-    }
-html, body {
-  height: 100%;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-}
 
-.container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--dark);
+            color: white;
+            padding: 20px 0;
+        }
 
-#output {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #334155;
+        }
 
-.table-wrapper {
-  flex: 1;
-  overflow-y: auto; /* Enables vertical scrolling */
-  overflow-x: auto; /* Enables horizontal scrolling */
-  border: 1px solid #ddd;
-  max-height: calc(100vh - 250px); /* Adjust based on header size */
-}
+        .sidebar-header h2 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.3rem;
+        }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  white-space: nowrap; /* Prevents text wrapping */
-}
+        .database-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 20px;
+            font-size: 0.9rem;
+        }
 
-th, td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+        .tables-list {
+            padding: 0 20px;
+        }
 
-th {
-  position: sticky;
-  top: 0;
-  background-color: #3498db;
-  color: white;
-  z-index: 2;
-}
+        .tables-list h3 {
+            margin: 20px 0 10px;
+            font-size: 1rem;
+            color: #94a3b8;
+        }
 
-tr:hover {
-  background-color: #f1f1f1;
-}
+        .table-item {
+            padding: 12px 15px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-.selected {
-  background-color: #f9eb3b !important;
-}
+        .table-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
 
-td:hover {
-  overflow: visible;
-  white-space: normal;
-  word-wrap: break-word;
-}
+        .table-item.active {
+            background: var(--primary);
+        }
 
-td[title] {
-  cursor: help;
-}
+        .table-stats {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
 
-  </style>
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            background: var(--light);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: var(--header-height);
+            background: white;
+            padding: 0 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--secondary);
+            color: var(--secondary);
+        }
+
+        .btn-outline:hover {
+            background: var(--secondary);
+            color: white;
+        }
+
+        /* Query Section */
+        .query-section {
+            padding: 25px 30px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .query-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .query-input {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 100px;
+            background: #f8fafc;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .query-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        /* Results Section */
+        .results-section {
+            flex: 1;
+            padding: 25px 30px;
+            overflow: auto;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .results-stats {
+            display: flex;
+            gap: 20px;
+            color: var(--secondary);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Table Styling */
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        th {
+            background: #f1f5f9;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .null-value {
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        .number-cell {
+            text-align: right;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Loading and Error States */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--secondary);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-left: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: var(--danger);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .history-item {
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .history-item:hover {
+            background: #f8fafc;
+        }
+
+        .history-sql {
+            font-family: 'Monaco', 'Menlo', monospace;
+            margin-bottom: 5px;
+        }
+
+        .history-meta {
+            font-size: 0.8rem;
+            color: var(--secondary);
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -613,7 +870,6 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                     <div class="tab active" onclick="switchTab('results')">Results</div>
                     <div class="tab" onclick="switchTab('schema')">Schema</div>
                     <div class="tab" onclick="switchTab('json')">JSON View</div>
-                    <div class="tab" onclick="switchTab('charts')">Charts</div>
                 </div>
 
                 <div id="loading" class="loading" style="display: none;">
@@ -653,13 +909,6 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                     <h3>JSON Data</h3>
                     <div id="json-output"></div>
                 </div>
-
-                <div class="tab-content" id="charts-tab">
-                    <h3>Data Visualization</h3>
-                    <div id="charts-output">
-                        <p>Select numeric columns to visualize data</p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -674,9 +923,6 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
     </div>
 
     <script>
-        // Enhanced JavaScript with all the features from the beautiful version
-        // Plus additional API integrations
-        
         let currentTable = null;
         let queryHistory = [];
 
@@ -686,9 +932,6 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             loadTables();
             loadQueryHistory();
             document.getElementById('query').focus();
-            
-            // Connect to WebSocket if enabled
-            connectWebSocket();
         });
 
         async function loadDatabaseInfo() {
@@ -697,8 +940,8 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 const info = await response.json();
                 
                 document.getElementById('db-name').textContent = info.name || 'app.db';
-                document.getElementById('db-version').textContent = info.version || '3.37.0';
-                document.getElementById('db-size').textContent = info.size || 'Calculating...';
+                document.getElementById('db-version').textContent = info.sqliteVersion || '3.37.0';
+                document.getElementById('db-size').textContent = info.sizeFormatted || 'Calculating...';
             } catch (error) {
                 console.error('Failed to load database info:', error);
             }
@@ -714,12 +957,12 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 tables.forEach(table => {
                     const tableItem = document.createElement('div');
                     tableItem.className = 'table-item';
-                    tableItem.innerHTML = `
+                    tableItem.innerHTML = \`
                         <div>
-                            <strong>${table.name}</strong>
-                            <div class="table-stats">${table.rowCount} rows</div>
+                            <strong>\${table.name}</strong>
+                            <div class="table-stats">\${table.rowCount} rows</div>
                         </div>
-                    `;
+                    \`;
                     tableItem.onclick = () => selectTable(table.name);
                     tablesContainer.appendChild(tableItem);
                 });
@@ -732,7 +975,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
 
         async function selectTable(tableName) {
             currentTable = tableName;
-            document.getElementById('query').value = `SELECT * FROM ${tableName} LIMIT 100`;
+            document.getElementById('query').value = \`SELECT * FROM \${tableName} LIMIT 100\`;
             runQuery();
             
             // Update active table in sidebar
@@ -747,7 +990,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
 
         async function loadSchema(tableName) {
             try {
-                const response = await fetch(`/api/tables/${tableName}/schema`);
+                const response = await fetch(\`/api/tables/\${tableName}/schema\`);
                 const schema = await response.json();
                 displaySchema(schema);
             } catch (error) {
@@ -759,12 +1002,12 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             let schemaHtml = '<div class="table-container"><table><thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Primary Key</th></tr></thead><tbody>';
             
             schema.forEach(column => {
-                schemaHtml += `<tr>
-                    <td><strong>${column.name}</strong></td>
-                    <td>${column.type}</td>
-                    <td>${column.nullable ? 'YES' : 'NO'}</td>
-                    <td>${column.primaryKey ? 'YES' : 'NO'}</td>
-                </tr>`;
+                schemaHtml += \`<tr>
+                    <td><strong>\${column.name}</strong></td>
+                    <td>\${column.type}</td>
+                    <td>\${column.nullable ? 'YES' : 'NO'}</td>
+                    <td>\${column.primaryKey ? 'YES' : 'NO'}</td>
+                </tr>\`;
             });
             
             schemaHtml += '</tbody></table></div>';
@@ -799,7 +1042,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
 
                 if (result.error) {
                     document.getElementById('error').style.display = 'block';
-                    document.getElementById('error').textContent = `Error: ${result.error}`;
+                    document.getElementById('error').textContent = \`Error: \${result.error}\`;
                     return;
                 }
 
@@ -815,12 +1058,99 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent = `Network Error: ${error.message}`;
+                document.getElementById('error').textContent = \`Network Error: \${error.message}\`;
             }
         }
 
-        // Include all the other JavaScript functions from the beautiful version
-        // displayTable, displayJson, switchTab, insertTemplate, clearQuery, formatQuery, etc.
+        function displayTable(data) {
+            if (data.length === 0) {
+                document.getElementById('output').innerHTML = '<p>No data found.</p>';
+                return;
+            }
+
+            const headers = Object.keys(data[0]);
+            let tableHtml = '<div class="table-container"><table><thead><tr>';
+            
+            headers.forEach(header => {
+                tableHtml += \`<th>\${header}</th>\`;
+            });
+            tableHtml += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                tableHtml += '<tr>';
+                headers.forEach(header => {
+                    const value = row[header];
+                    let cellContent = '';
+                    let cellClass = '';
+
+                    if (value === null || value === undefined) {
+                        cellContent = '<span class="null-value">NULL</span>';
+                    } else if (typeof value === 'number') {
+                        cellContent = value.toLocaleString();
+                        cellClass = 'number-cell';
+                    } else {
+                        cellContent = value.toString().length > 50 ? 
+                            value.toString().substring(0, 47) + '...' : 
+                            value.toString();
+                    }
+
+                    tableHtml += \`<td class="\${cellClass}" title="\${value}">\${cellContent}</td>\`;
+                });
+                tableHtml += '</tr>';
+            });
+
+            tableHtml += '</tbody></table></div>';
+            document.getElementById('output').innerHTML = tableHtml;
+        }
+
+        function displayJson(data) {
+            const jsonOutput = document.getElementById('json-output');
+            jsonOutput.innerHTML = \`<div class="json-viewer">\${JSON.stringify(data, null, 2)}</div>\`;
+        }
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(\`\${tabName}-tab\`).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        function insertTemplate(type) {
+            const templates = {
+                SELECT: 'SELECT * FROM users WHERE age > 25 ORDER BY name;',
+                INSERT: "INSERT INTO users (name, email, age) VALUES ('John Doe', 'john@example.com', 30);",
+                UPDATE: "UPDATE users SET age = 31 WHERE name = 'John Doe';",
+                DELETE: "DELETE FROM users WHERE age < 18;"
+            };
+            
+            document.getElementById('query').value = templates[type];
+        }
+
+        function clearQuery() {
+            document.getElementById('query').value = '';
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function formatQuery() {
+            const query = document.getElementById('query').value;
+            // Basic formatting
+            const formatted = query
+                .replace(/\\bSELECT\\b/gi, '\\nSELECT')
+                .replace(/\\bFROM\\b/gi, '\\nFROM')
+                .replace(/\\bWHERE\\b/gi, '\\nWHERE')
+                .replace(/\\bORDER BY\\b/gi, '\\nORDER BY')
+                .replace(/\\bGROUP BY\\b/gi, '\\nGROUP BY');
+            
+            document.getElementById('query').value = formatted.trim();
+        }
 
         async function loadQueryHistory() {
             try {
@@ -849,15 +1179,15 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             const modal = document.getElementById('historyModal');
             const historyList = document.getElementById('history-list');
             
-            historyList.innerHTML = queryHistory.map((query, index) => `
-                <div class="history-item" onclick="useHistoryQuery('${query.sql.replace(/'/g, "\\'")}')">
-                    <div class="history-sql">${query.sql}</div>
+            historyList.innerHTML = queryHistory.map((query, index) => \`
+                <div class="history-item" onclick="useHistoryQuery('\${query.sql.replace(/'/g, "\\\\'")}')">
+                    <div class="history-sql">\${query.sql}</div>
                     <div class="history-meta">
-                        ${query.rowCount} rows • ${query.executionTime}ms • 
-                        ${new Date(query.timestamp).toLocaleString()}
+                        \${query.rowCount} rows • \${query.executionTime}ms • 
+                        \${new Date(query.timestamp).toLocaleString()}
                     </div>
                 </div>
-            `).join('');
+            \`).join('');
             
             modal.style.display = 'block';
         }
@@ -869,40 +1199,6 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
         function useHistoryQuery(sql) {
             document.getElementById('query').value = sql;
             closeHistoryModal();
-        }
-
-        function connectWebSocket() {
-            try {
-                const ws = new WebSocket('ws://' + window.location.host + '/ws');
-                
-                ws.onopen = function() {
-                    console.log('WebSocket connected');
-                    // Subscribe to table updates
-                    ws.send(JSON.stringify({ action: 'subscribe_tables' }));
-                };
-                
-                ws.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    // Handle real-time updates
-                    if (data.type === 'table_update') {
-                        // Refresh current table if it matches
-                        if (currentTable && data.table === currentTable) {
-                            loadTables(); // Refresh table list
-                            if (document.getElementById('query').value.includes(`FROM ${currentTable}`)) {
-                                runQuery(); // Refresh current query
-                            }
-                        }
-                    }
-                };
-                
-                ws.onclose = function() {
-                    console.log('WebSocket disconnected');
-                    // Attempt to reconnect after 5 seconds
-                    setTimeout(connectWebSocket, 5000);
-                };
-            } catch (error) {
-                console.log('WebSocket not available');
-            }
         }
 
         async function explainQuery() {
@@ -926,10 +1222,8 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             const format = prompt('Export format (json/csv):', 'json');
             if (!format) return;
             
-            window.open(`/api/export/${currentTable}?format=${format}`, '_blank');
+            window.open(\`/api/export/\${currentTable}?format=\${format}\`, '_blank');
         }
-
-        // Add all other utility functions from the beautiful version...
     </script>
 </body>
 </html>
