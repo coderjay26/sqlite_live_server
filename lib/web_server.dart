@@ -10,69 +10,114 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'sqlite_service.dart';
 
 class WebServer {
-  final SQLiteService dbService;
+    final SQLiteService dbService;
   HttpServer? _server;
   final int port;
   final bool enableWebSocket;
+  bool _isRunning = false;
 
   WebServer(this.dbService, {this.port = 8080, this.enableWebSocket = true});
 
-  Future<void> startServer() async {
-    String? ipAddress = await _getLocalIPAddress();
+  Future<bool> startServer() async {
+    try {
+      if (_isRunning) {
+        print('🚨 Server is already running');
+        return true;
+      }
 
-    var router = Router();
+      // Check if port is available
+      if (await _isPortInUse(port)) {
+        print('🚨 Port $port is already in use. Trying port ${port + 1}');
+        return await startServerWithPort(port + 1);
+      }
 
-    // Serve static files (for assets)
-    var staticHandler = createStaticHandler('web_assets', defaultDocument: 'index.html');
+      String? ipAddress = await _getLocalIPAddress();
 
-    // API Routes
-    router.get('/api/tables', _getTables);
-    router.get('/api/tables/<table>/schema', _getTableSchema);
-    router.get('/api/tables/<table>/info', _getTableInfo);
-    router.get('/api/query', _executeQuery);
-    router.post('/api/query', _executeQueryPost);
-    router.post('/api/tables/<table>/data', _insertData);
-    router.put('/api/tables/<table>/data', _updateData);
-    router.delete('/api/tables/<table>/data', _deleteData);
-    router.get('/api/database/info', _getDatabaseInfo);
-    router.get('/api/export/<table>', _exportTable);
-    router.get('/api/history', _getQueryHistory);
+      var router = Router();
 
-    // WebSocket for real-time updates
-    if (enableWebSocket) {
-      router.get('/ws', webSocketHandler((WebSocketChannel webSocket) {
-        webSocket.stream.listen((message) {
-          _handleWebSocketMessage(webSocket, message);
-        });
-      }));
+      // API Routes
+      router.get('/api/tables', _getTables);
+      router.get('/api/tables/<table>/schema', _getTableSchema);
+      router.get('/api/tables/<table>/info', _getTableInfo);
+      router.get('/api/query', _executeQuery);
+      router.post('/api/query', _executeQueryPost);
+      router.post('/api/tables/<table>/data', _insertData);
+      router.put('/api/tables/<table>/data', _updateData);
+      router.delete('/api/tables/<table>/data', _deleteData);
+      router.get('/api/database/info', _getDatabaseInfo);
+      router.get('/api/export/<table>', _exportTable);
+      router.get('/api/history', _getQueryHistory);
+
+      // WebSocket for real-time updates
+      if (enableWebSocket) {
+        router.get('/ws', webSocketHandler((WebSocketChannel webSocket) {
+          webSocket.stream.listen(
+            (message) => _handleWebSocketMessage(webSocket, message),
+            onError: (error) => print('WebSocket error: $error'),
+            onDone: () => print('WebSocket disconnected'),
+          );
+        }));
+      }
+
+      // Serve the main application
+      router.get('/', (Request request) {
+        return Response.ok(_htmlPage, headers: {'Content-Type': 'text/html'});
+      });
+
+      var handler = Pipeline()
+          .addMiddleware(logRequests())
+          .addMiddleware(_corsMiddleware())
+          .addHandler(router);
+
+      _server = await io.serve(handler, InternetAddress.anyIPv4, port);
+      _isRunning = true;
+      
+      print('\x1B[32m🚀 SQLite Pro Server started successfully!\x1B[0m');
+      print('\x1B[36m📍 Local: http://localhost:$port\x1B[0m');
+      if (ipAddress != null) {
+        print('\x1B[36m🌐 Network: http://$ipAddress:$port\x1B[0m');
+      } else {
+        print('\x1B[33m⚠️  Could not detect network IP address\x1B[0m');
+      }
+      print('\x1B[33m⚡ Press Ctrl+C to stop the server\x11B[0m');
+      
+      return true;
+    } catch (e, stackTrace) {
+      print('\x1B[31m🚨 Failed to start server: $e\x1B[0m');
+      print('\x1B[31mStack trace: $stackTrace\x1B[0m');
+      
+      // Try alternative port
+      if (e.toString().contains('bind') || e.toString().contains('port')) {
+        print('\x1B[33m🔄 Trying alternative port...\x1B[0m');
+        return await startServerWithPort(port + 1);
+      }
+      
+      return false;
     }
-
-    // Serve the main application
-    router.get('/', (Request request) {
-      return Response.ok(_htmlPage, headers: {'Content-Type': 'text/html'});
-    });
-
-    // Fallback to static handler
-    router.all('/<ignored|.*>', (Request request) => staticHandler(request));
-
-    var handler = Pipeline()
-        .addMiddleware(logRequests())
-        .addMiddleware(_corsMiddleware())
-        .addMiddleware(_authMiddleware())
-        .addHandler(router);
-
-    _server = await io.serve(handler, InternetAddress.anyIPv4, port);
-    
-    print('\x1B[32m🚀 SQLite Pro Server started!\x1B[0m');
-    print('\x1B[36m📍 Local: http://localhost:$port\x1B[0m');
-    if (ipAddress != null) {
-      print('\x1B[36m🌐 Network: http://$ipAddress:$port\x1B[0m');
-    }
-    print('\x1B[33m⚡ Press Ctrl+C to stop the server\x1B[0m');
   }
 
+  Future<bool> startServerWithPort(int newPort) async {
+    try {
+      await stopServer();
+      var newServer = WebServer(dbService, port: newPort, enableWebSocket: enableWebSocket);
+      return await newServer.startServer();
+    } catch (e) {
+      print('\x1B[31m🚨 Failed to start server on port $newPort: $e\x1B[0m');
+      return false;
+    }
+  }
+
+  Future<bool> _isPortInUse(int port) async {
+    try {
+      var server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+      await server.close();
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
   // CORS middleware
-  Middleware _corsMiddleware() {
+ Middleware _corsMiddleware() {
     return (Handler handler) {
       return (Request request) async {
         if (request.method == 'OPTIONS') {
@@ -368,9 +413,13 @@ class WebServer {
     }
   }
 
-  Future<void> stopServer() async {
-    await _server?.close();
-    print('\x1B[31m🛑 Server stopped\x1B[0m');
+   Future<void> stopServer() async {
+    if (_server != null) {
+      await _server!.close(force: true);
+      _server = null;
+      _isRunning = false;
+      print('\x1B[31m🛑 Server stopped\x1B[0m');
+    }
   }
 
   Future<String?> _getLocalIPAddress() async {
@@ -378,26 +427,18 @@ class WebServer {
       for (var interface in await NetworkInterface.list()) {
         for (var addr in interface.addresses) {
           if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-            // Prefer wlan0 for WiFi, but fall back to any non-loopback
-            if (interface.name == 'wlan0') {
-              return addr.address;
-            }
-          }
-        }
-      }
-      // Fallback: get any non-loopback IPv4
-      for (var interface in await NetworkInterface.list()) {
-        for (var addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+            // Return the first non-loopback IPv4 address
             return addr.address;
           }
         }
       }
     } catch (e) {
-      print('Error getting IP address: $e');
+      print('Warning: Could not get local IP address: $e');
     }
     return null;
   }
+
+  bool get isRunning => _isRunning;
 
   // Enhanced HTML page with modern features
   static const String _htmlPage = '''
