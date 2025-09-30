@@ -1004,7 +1004,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                             <div class="table-stats">\${table.rowCount} rows</div>
                         </div>
                     \`;
-                    tableItem.onclick = () => selectTable(table.name);
+                    tableItem.onclick = (event) => selectTable(table.name, event.currentTarget);
                     tablesContainer.appendChild(tableItem);
                 });
             } catch (error) {
@@ -1014,19 +1014,20 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             }
         }
 
-        async function selectTable(tableName) {
-            currentTable = tableName;
-            document.getElementById('query').value = \`SELECT * FROM \${tableName} LIMIT 100\`;
-            runQuery();
-            
-            // Update active table in sidebar
-            document.querySelectorAll('.table-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            event.currentTarget.classList.add('active');
-            
-            // Load schema
-            loadSchema(tableName);
+        async function selectTable(tableName, clickedElement) {
+          currentTable = tableName;
+          document.getElementById('query').value = `SELECT * FROM \${tableName} LIMIT 100`;
+          runQuery();
+        
+          document.querySelectorAll('.table-item').forEach(item => {
+            item.classList.remove('active');
+          });
+          
+          if (clickedElement) {
+            clickedElement.classList.add('active');
+          }
+          
+          loadSchema(tableName);
         }
 
         async function loadSchema(tableName) {
