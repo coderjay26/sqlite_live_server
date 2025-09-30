@@ -426,7 +426,7 @@ class WebServer {
     try {
       for (var interface in await NetworkInterface.list()) {
         for (var addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback && interface.name == 'wlan0') {
             // Return the first non-loopback IPv4 address
             return addr.address;
           }
