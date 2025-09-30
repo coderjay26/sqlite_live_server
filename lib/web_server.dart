@@ -1150,8 +1150,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             jsonOutput.innerHTML = \`<div class="json-viewer">\${JSON.stringify(data, null, 2)}</div>\`;
         }
 
-        function switchTab(tabName) {
-            // Hide all tabs
+        function switchTab(tabName, clickedElement) {
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
@@ -1159,9 +1158,13 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 tab.classList.remove('active');
             });
 
-            // Show selected tab
-            document.getElementById(\`\${tabName}-tab\`).classList.add('active');
-            event.currentTarget.classList.add('active');
+
+            document.getElementById(`\${tabName}-tab`).classList.add('active');
+            
+          
+            if (clickedElement) {
+                clickedElement.classList.add('active');
+            }
         }
 
         function insertTemplate(type) {
