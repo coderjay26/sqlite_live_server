@@ -1328,7 +1328,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
         
         // Pagination state
         let currentPage = 1;
-        let pageSize = 50;
+        let pageSize = 10;
         let totalRows = 0;
         let currentData = [];
 
