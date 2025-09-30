@@ -908,14 +908,14 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             <!-- Results Section -->
             <div class="results-section">
                 <div class="tabs">
-                    <div class="tab active" onclick="switchTab('results')">Results</div>
-                    <div class="tab" onclick="switchTab('schema')">Schema</div>
-                    <div class="tab" onclick="switchTab('json')">JSON View</div>
+                   <div class="tab active" onclick="switchTab('results', this)">Results</div>
+                   <div class="tab" onclick="switchTab('schema', this)">Schema</div>
+                   <div class="tab" onclick="switchTab('json', this)">JSON View</div>
                 </div>
 
                 <div id="loading" class="loading" style="display: none;">
                     <div class="spinner"></div>
-                    <p>Executing query...</p>
+                    <p>Executing query...</p> 
                 </div>
 
                 <div id="error" class="error-message" style="display: none;"></div>
