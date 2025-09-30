@@ -487,13 +487,21 @@ class WebServer {
             background: var(--dark);
             color: white;
             padding: 20px 0;
+            display: flex;
+            flex-direction: column;
         }
 
         .sidebar-header {
             padding: 0 20px 20px;
             border-bottom: 1px solid #334155;
         }
-
+        .powered-by {
+              font-size: 0.7rem;
+              color: #94a3b8;
+              margin-top: 5px;
+              font-style: italic;
+              text-align: center;
+          }
         .sidebar-header h2 {
             display: flex;
             align-items: center;
@@ -511,24 +519,94 @@ class WebServer {
 
         .tables-list {
             padding: 0 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         .tables-list h3 {
-            margin: 20px 0 10px;
+            margin: 0 0 10px 0;
             font-size: 1rem;
             color: #94a3b8;
         }
 
+        /* Search styles */
+        .search-container {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 30px 8px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #475569;
+            border-radius: 4px;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .search-input::placeholder {
+            color: #94a3b8;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .tables-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            max-height: 400px;
+        }
+
+        /* Scrollbar styling */
+        .tables-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .tables-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .tables-container::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .tables-container::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+
         .table-item {
             padding: 12px 15px;
-            margin: 5px 0;
+            margin: 0;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid #334155;
+        }
+
+        .table-item:last-child {
+            border-bottom: none;
         }
 
         .table-item:hover {
@@ -542,6 +620,14 @@ class WebServer {
         .table-stats {
             font-size: 0.8rem;
             color: #94a3b8;
+        }
+
+        .table-count {
+            padding: 5px 0;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-align: center;
+            border-top: 1px solid #334155;
         }
 
         /* Main Content */
@@ -610,6 +696,7 @@ class WebServer {
             display: flex;
             gap: 10px;
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
 
         .query-input {
@@ -627,12 +714,14 @@ class WebServer {
         .query-input:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
         .query-actions {
             display: flex;
             gap: 10px;
             margin-top: 15px;
+            flex-wrap: wrap;
         }
 
         /* Results Section */
@@ -647,12 +736,15 @@ class WebServer {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
         }
 
         .results-stats {
             display: flex;
             gap: 20px;
             color: var(--secondary);
+            flex-wrap: wrap;
         }
 
         .stat-item {
@@ -711,11 +803,125 @@ class WebServer {
             font-family: 'Monaco', 'Menlo', monospace;
         }
 
+        .boolean-cell {
+            text-align: center;
+        }
+
+        .boolean-true {
+            color: var(--success);
+        }
+
+        .boolean-false {
+            color: var(--danger);
+        }
+
+        /* Pagination Styles */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .pagination-info {
+            font-size: 0.9rem;
+            color: var(--secondary);
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pagination-btn {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .pagination-btn:disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .pagination-pages {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .page-btn {
+            padding: 6px 10px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            min-width: 35px;
+            text-align: center;
+        }
+
+        .page-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .page-btn:hover:not(.active) {
+            background: #f1f5f9;
+        }
+
+        .page-input {
+            width: 60px;
+            padding: 6px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .page-size-select {
+            padding: 6px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background: white;
+            font-size: 0.9rem;
+        }
+
+        /* JSON Viewer */
+        .json-viewer {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
         /* Tabs */
         .tabs {
             display: flex;
             border-bottom: 1px solid #e2e8f0;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
 
         .tab {
@@ -773,6 +979,15 @@ class WebServer {
             margin: 15px 0;
         }
 
+        .success-message {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: var(--success);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -825,6 +1040,69 @@ class WebServer {
             font-size: 0.8rem;
             color: var(--secondary);
         }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 40vh;
+            }
+            
+            .tables-container {
+                max-height: 200px;
+            }
+            
+            .header {
+                padding: 0 15px;
+            }
+            
+            .query-section, .results-section {
+                padding: 15px;
+            }
+            
+            .query-toolbar, .query-actions {
+                justify-content: center;
+            }
+            
+            .results-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .results-stats {
+                justify-content: flex-start;
+            }
+            
+            .pagination {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .pagination-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+
+        /* No results state */
+        .no-tables {
+            padding: 20px;
+            text-align: center;
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        .no-results {
+            padding: 20px;
+            text-align: center;
+            color: var(--secondary);
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -833,6 +1111,7 @@ class WebServer {
         <div class="sidebar">
             <div class="sidebar-header">
                 <h2><i class="fas fa-database"></i> SQLite Pro</h2>
+                <div class="powered-by">Powered by JJ Automation Solutions (Jay Fuego)</div>
             </div>
             
             <div class="database-info">
@@ -843,8 +1122,21 @@ class WebServer {
             
             <div class="tables-list">
                 <h3>Tables</h3>
-                <div id="tables-container">
+                
+                <!-- Search input -->
+                <div class="search-container">
+                    <input type="text" id="tableSearch" placeholder="Search tables..." 
+                           class="search-input" oninput="filterTables()">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                
+                <div class="tables-container" id="tables-container">
                     <div class="loading">Loading tables...</div>
+                </div>
+                
+                <!-- Table count -->
+                <div class="table-count" id="tableCount">
+                    <span>0 tables</span>
                 </div>
             </div>
         </div>
@@ -908,14 +1200,14 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             <!-- Results Section -->
             <div class="results-section">
                 <div class="tabs">
-                   <div class="tab active" onclick="switchTab('results', this)">Results</div>
-                   <div class="tab" onclick="switchTab('schema', this)">Schema</div>
-                   <div class="tab" onclick="switchTab('json', this)">JSON View</div>
+                    <div class="tab active" onclick="switchTab('results', this)">Results</div>
+                    <div class="tab" onclick="switchTab('schema', this)">Schema</div>
+                    <div class="tab" onclick="switchTab('json', this)">JSON View</div>
                 </div>
 
                 <div id="loading" class="loading" style="display: none;">
                     <div class="spinner"></div>
-                    <p>Executing query...</p> 
+                    <p>Executing query...</p>
                 </div>
 
                 <div id="error" class="error-message" style="display: none;"></div>
@@ -939,6 +1231,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                         </div>
                     </div>
                     <div id="output"></div>
+                    <!-- Pagination will be inserted here by JavaScript -->
                 </div>
 
                 <div class="tab-content" id="schema-tab">
@@ -966,6 +1259,13 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
     <script>
         let currentTable = null;
         let queryHistory = [];
+        let allTables = [];
+        
+        // Pagination state
+        let currentPage = 1;
+        let pageSize = 50;
+        let totalRows = 0;
+        let currentData = [];
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
@@ -991,22 +1291,9 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
         async function loadTables() {
             try {
                 const response = await fetch('/api/tables');
-                const tables = await response.json();
-                const tablesContainer = document.getElementById('tables-container');
-                
-                tablesContainer.innerHTML = '';
-                tables.forEach(table => {
-                    const tableItem = document.createElement('div');
-                    tableItem.className = 'table-item';
-                    tableItem.innerHTML = \`
-                        <div>
-                            <strong>\${table.name}</strong>
-                            <div class="table-stats">\${table.rowCount} rows</div>
-                        </div>
-                    \`;
-                    tableItem.onclick = (event) => selectTable(table.name, event.currentTarget);
-                    tablesContainer.appendChild(tableItem);
-                });
+                allTables = await response.json();
+                renderTables(allTables);
+                updateTableCount(allTables.length);
             } catch (error) {
                 console.error('Failed to load tables:', error);
                 document.getElementById('tables-container').innerHTML = 
@@ -1014,20 +1301,71 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             }
         }
 
+        function renderTables(tables) {
+            const tablesContainer = document.getElementById('tables-container');
+            
+            if (tables.length === 0) {
+                tablesContainer.innerHTML = '<div class="no-tables">No tables found</div>';
+                return;
+            }
+            
+            tablesContainer.innerHTML = '';
+            tables.forEach(table => {
+                const tableItem = document.createElement('div');
+                tableItem.className = 'table-item';
+                tableItem.innerHTML = \`
+                    <div>
+                        <strong>\${table.name}</strong>
+                        <div class="table-stats">\${table.rowCount} rows</div>
+                    </div>
+                \`;
+                tableItem.onclick = (event) => selectTable(table.name, event.currentTarget);
+                tablesContainer.appendChild(tableItem);
+            });
+        }
+
+        function filterTables() {
+            const searchTerm = document.getElementById('tableSearch').value.toLowerCase();
+            
+            if (searchTerm === '') {
+                renderTables(allTables);
+                updateTableCount(allTables.length);
+                return;
+            }
+            
+            const filteredTables = allTables.filter(table => 
+                table.name.toLowerCase().includes(searchTerm)
+            );
+            
+            renderTables(filteredTables);
+            updateTableCount(filteredTables.length, allTables.length);
+        }
+
+        function updateTableCount(visibleCount, totalCount = null) {
+            const countElement = document.getElementById('tableCount');
+            if (totalCount && visibleCount !== totalCount) {
+                countElement.innerHTML = \`<span>\${visibleCount} of \${totalCount} tables</span>\`;
+            } else {
+                countElement.innerHTML = \`<span>\${visibleCount} tables</span>\`;
+            }
+        }
+
         async function selectTable(tableName, clickedElement) {
-          currentTable = tableName;
-          document.getElementById('query').value = `SELECT * FROM \${tableName} LIMIT 100`;
-          runQuery();
-        
-          document.querySelectorAll('.table-item').forEach(item => {
-            item.classList.remove('active');
-          });
-          
-          if (clickedElement) {
-            clickedElement.classList.add('active');
-          }
-          
-          loadSchema(tableName);
+            currentTable = tableName;
+            document.getElementById('query').value = \`SELECT * FROM \${tableName} LIMIT 1000\`;
+            runQuery();
+            
+            // Update active table in sidebar
+            document.querySelectorAll('.table-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            if (clickedElement) {
+                clickedElement.classList.add('active');
+            }
+            
+            // Load schema
+            loadSchema(tableName);
         }
 
         async function loadSchema(tableName) {
@@ -1092,11 +1430,16 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 document.getElementById('queryTime').textContent = result.executionTime || executionTime;
                 document.getElementById('columnCount').textContent = result.columns ? result.columns.length : 0;
                 
-                displayTable(result.data);
-                displayJson(result.data);
+                // Store the data for pagination
+                currentData = result.data;
+                totalRows = result.rowCount;
+                currentPage = 1;
+                
+                // Display first page
+                displayCurrentPage();
                 updateQueryHistory(query, result.rowCount, executionTime);
                 
-                switchTab('results');
+                switchTab('results', document.querySelector('.tab[onclick*="results"]'));
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
@@ -1104,12 +1447,26 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             }
         }
 
-        function displayTable(data) {
-            if (data.length === 0) {
-                document.getElementById('output').innerHTML = '<p>No data found.</p>';
+        function displayCurrentPage() {
+            if (currentData.length === 0) {
+                document.getElementById('output').innerHTML = '<div class="no-results">No data found</div>';
                 return;
             }
 
+            // Calculate pagination
+            const totalPages = Math.ceil(totalRows / pageSize);
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, totalRows);
+            const pageData = currentData.slice(startIndex, endIndex);
+
+            // Display the table
+            displayTable(pageData);
+            
+            // Add pagination controls
+            addPaginationControls(totalPages, startIndex, endIndex);
+        }
+
+        function displayTable(data) {
             const headers = Object.keys(data[0]);
             let tableHtml = '<div class="table-container"><table><thead><tr>';
             
@@ -1130,6 +1487,11 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                     } else if (typeof value === 'number') {
                         cellContent = value.toLocaleString();
                         cellClass = 'number-cell';
+                    } else if (typeof value === 'boolean') {
+                        cellContent = value ? 
+                            '<i class="fas fa-check boolean-true"></i>' : 
+                            '<i class="fas fa-times boolean-false"></i>';
+                        cellClass = 'boolean-cell';
                     } else {
                         cellContent = value.toString().length > 50 ? 
                             value.toString().substring(0, 47) + '...' : 
@@ -1145,12 +1507,121 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             document.getElementById('output').innerHTML = tableHtml;
         }
 
+        function addPaginationControls(totalPages, startIndex, endIndex) {
+            const paginationHtml = \`
+                <div class="pagination">
+                    <div class="pagination-info">
+                        Showing \${startIndex + 1} to \${endIndex} of \${totalRows} entries
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" onclick="goToPage(1)" \${currentPage === 1 ? 'disabled' : ''}>
+                            <i class="fas fa-angle-double-left"></i>
+                        </button>
+                        <button class="pagination-btn" onclick="goToPage(\${currentPage - 1})" \${currentPage === 1 ? 'disabled' : ''}>
+                            <i class="fas fa-angle-left"></i>
+                        </button>
+                        
+                        <div class="pagination-pages">
+                            \${generatePageButtons(totalPages)}
+                        </div>
+                        
+                        <button class="pagination-btn" onclick="goToPage(\${currentPage + 1})" \${currentPage === totalPages ? 'disabled' : ''}>
+                            <i class="fas fa-angle-right"></i>
+                        </button>
+                        <button class="pagination-btn" onclick="goToPage(\${totalPages})" \${currentPage === totalPages ? 'disabled' : ''}>
+                            <i class="fas fa-angle-double-right"></i>
+                        </button>
+                    </div>
+                    <div class="pagination-settings">
+                        <select class="page-size-select" onchange="changePageSize(this.value)">
+                            <option value="10" \${pageSize === 10 ? 'selected' : ''}>10 per page</option>
+                            <option value="25" \${pageSize === 25 ? 'selected' : ''}>25 per page</option>
+                            <option value="50" \${pageSize === 50 ? 'selected' : ''}>50 per page</option>
+                            <option value="100" \${pageSize === 100 ? 'selected' : ''}>100 per page</option>
+                            <option value="250" \${pageSize === 250 ? 'selected' : ''}>250 per page</option>
+                        </select>
+                        <input type="number" class="page-input" min="1" max="\${totalPages}" value="\${currentPage}" 
+                               onchange="goToPage(parseInt(this.value))" onkeypress="handlePageInput(event)">
+                        <span>of \${totalPages}</span>
+                    </div>
+                </div>
+            \`;
+            
+            document.getElementById('output').innerHTML += paginationHtml;
+        }
+
+        function generatePageButtons(totalPages) {
+            let buttons = '';
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            // Adjust start page if we're near the end
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            // Show first page and ellipsis if needed
+            if (startPage > 1) {
+                buttons += \`<button class="page-btn" onclick="goToPage(1)">1</button>\`;
+                if (startPage > 2) {
+                    buttons += '<span>...</span>';
+                }
+            }
+            
+            // Show page buttons
+            for (let i = startPage; i <= endPage; i++) {
+                buttons += \`<button class="page-btn \${i === currentPage ? 'active' : ''}" onclick="goToPage(\${i})">\${i}</button>\`;
+            }
+            
+            // Show last page and ellipsis if needed
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    buttons += '<span>...</span>';
+                }
+                buttons += \`<button class="page-btn" onclick="goToPage(\${totalPages})">\${totalPages}</button>\`;
+            }
+            
+            return buttons;
+        }
+
+        function goToPage(page) {
+            const totalPages = Math.ceil(totalRows / pageSize);
+            if (page < 1 || page > totalPages || page === currentPage) return;
+            
+            currentPage = page;
+            displayCurrentPage();
+            
+            // Scroll to top of results
+            document.getElementById('output').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function changePageSize(newSize) {
+            pageSize = parseInt(newSize);
+            currentPage = 1;
+            displayCurrentPage();
+        }
+
+        function handlePageInput(event) {
+            if (event.key === 'Enter') {
+                const page = parseInt(event.target.value);
+                const totalPages = Math.ceil(totalRows / pageSize);
+                
+                if (page >= 1 && page <= totalPages) {
+                    goToPage(page);
+                } else {
+                    event.target.value = currentPage; // Reset to current page
+                }
+            }
+        }
+
         function displayJson(data) {
             const jsonOutput = document.getElementById('json-output');
             jsonOutput.innerHTML = \`<div class="json-viewer">\${JSON.stringify(data, null, 2)}</div>\`;
         }
 
         function switchTab(tabName, clickedElement) {
+            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
@@ -1158,10 +1629,10 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 tab.classList.remove('active');
             });
 
-
-            document.getElementById(`\${tabName}-tab`).classList.add('active');
+            // Show selected tab
+            document.getElementById(\`\${tabName}-tab\`).classList.add('active');
             
-          
+            // Activate clicked tab
             if (clickedElement) {
                 clickedElement.classList.add('active');
             }
@@ -1182,6 +1653,9 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             document.getElementById('query').value = '';
             document.getElementById('output').innerHTML = '';
             document.getElementById('error').style.display = 'none';
+            currentData = [];
+            totalRows = 0;
+            currentPage = 1;
         }
 
         function formatQuery() {
@@ -1269,6 +1743,18 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             
             window.open(\`/api/export/\${currentTable}?format=\${format}\`, '_blank');
         }
+
+        // Handle responsive behavior
+        window.addEventListener('resize', function() {
+            // Adjust table container height on resize
+            const tablesContainer = document.getElementById('tables-container');
+            const sidebar = document.querySelector('.sidebar');
+            if (window.innerWidth <= 768) {
+                tablesContainer.style.maxHeight = '200px';
+            } else {
+                tablesContainer.style.maxHeight = '400px';
+            }
+        });
     </script>
 </body>
 </html>
