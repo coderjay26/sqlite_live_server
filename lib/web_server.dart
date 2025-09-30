@@ -441,7 +441,7 @@ class WebServer {
   bool get isRunning => _isRunning;
 
   // Enhanced HTML page with modern features
-  static const String _htmlPage = '''
+ static const String _htmlPage = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -494,19 +494,22 @@ class WebServer {
         .sidebar-header {
             padding: 0 20px 20px;
             border-bottom: 1px solid #334155;
+            text-align: center;
         }
+
         .powered-by {
-              font-size: 0.7rem;
-              color: #94a3b8;
-              margin-top: 5px;
-              font-style: italic;
-              text-align: center;
-          }
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
         .sidebar-header h2 {
             display: flex;
             align-items: center;
             gap: 10px;
             font-size: 1.3rem;
+            justify-content: center;
         }
 
         .database-info {
@@ -636,6 +639,7 @@ class WebServer {
             background: var(--light);
             display: flex;
             flex-direction: column;
+            overflow: hidden; /* Prevent main content from expanding */
         }
 
         .header {
@@ -646,6 +650,7 @@ class WebServer {
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0; /* Prevent header from expanding */
         }
 
         .header-actions {
@@ -690,6 +695,7 @@ class WebServer {
             padding: 25px 30px;
             background: white;
             border-bottom: 1px solid #e2e8f0;
+            flex-shrink: 0; /* Prevent query section from expanding */
         }
 
         .query-toolbar {
@@ -729,6 +735,8 @@ class WebServer {
             flex: 1;
             padding: 25px 30px;
             overflow: auto;
+            display: flex;
+            flex-direction: column;
         }
 
         .results-header {
@@ -738,6 +746,7 @@ class WebServer {
             margin-bottom: 20px;
             flex-wrap: wrap;
             gap: 15px;
+            flex-shrink: 0; /* Prevent results header from expanding */
         }
 
         .results-stats {
@@ -751,22 +760,40 @@ class WebServer {
             display: flex;
             align-items: center;
             gap: 5px;
+            white-space: nowrap; /* Prevent stats from wrapping */
         }
 
-        /* Table Styling */
+        /* Table Container - FIXED FOR HORIZONTAL SCROLLING */
+        .table-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0; /* Important for flex child scrolling */
+        }
+
         .table-container {
             background: white;
             border-radius: 8px;
-            overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             margin-bottom: 20px;
+            overflow: hidden; /* Contain the table and scrollbar */
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0; /* Important for flex child scrolling */
+        }
+
+        .table-scroll-container {
             overflow-x: auto;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0; /* Important for flex child scrolling */
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 600px;
+            min-width: 100%; /* Ensure table takes full width of container */
         }
 
         th {
@@ -778,6 +805,7 @@ class WebServer {
             border-bottom: 1px solid #e2e8f0;
             position: sticky;
             top: 0;
+            white-space: nowrap; /* Prevent header text from wrapping */
         }
 
         td {
@@ -815,7 +843,7 @@ class WebServer {
             color: var(--danger);
         }
 
-        /* Pagination Styles */
+        /* Pagination Styles - FIXED WIDTH */
         .pagination {
             display: flex;
             justify-content: space-between;
@@ -825,17 +853,22 @@ class WebServer {
             border-top: 1px solid #e2e8f0;
             flex-wrap: wrap;
             gap: 10px;
+            flex-shrink: 0; /* Prevent pagination from expanding */
+            width: 100%; /* Ensure pagination stays within container */
+            box-sizing: border-box;
         }
 
         .pagination-info {
             font-size: 0.9rem;
             color: var(--secondary);
+            white-space: nowrap; /* Prevent pagination info from wrapping */
         }
 
         .pagination-controls {
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .pagination-btn {
@@ -846,6 +879,7 @@ class WebServer {
             cursor: pointer;
             transition: all 0.2s;
             font-size: 0.9rem;
+            flex-shrink: 0; /* Prevent buttons from shrinking */
         }
 
         .pagination-btn:hover:not(:disabled) {
@@ -864,6 +898,7 @@ class WebServer {
             display: flex;
             gap: 5px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .page-btn {
@@ -875,6 +910,7 @@ class WebServer {
             font-size: 0.8rem;
             min-width: 35px;
             text-align: center;
+            flex-shrink: 0; /* Prevent page buttons from shrinking */
         }
 
         .page-btn.active {
@@ -894,6 +930,7 @@ class WebServer {
             border-radius: 4px;
             text-align: center;
             font-size: 0.9rem;
+            flex-shrink: 0;
         }
 
         .page-size-select {
@@ -902,6 +939,14 @@ class WebServer {
             border-radius: 4px;
             background: white;
             font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .pagination-settings {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         /* JSON Viewer */
@@ -922,6 +967,7 @@ class WebServer {
             border-bottom: 1px solid #e2e8f0;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            flex-shrink: 0; /* Prevent tabs from expanding */
         }
 
         .tab {
@@ -929,6 +975,7 @@ class WebServer {
             cursor: pointer;
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
+            flex-shrink: 0; /* Prevent tabs from shrinking */
         }
 
         .tab.active {
@@ -939,10 +986,13 @@ class WebServer {
 
         .tab-content {
             display: none;
+            flex: 1;
+            min-height: 0; /* Important for flex child scrolling */
         }
 
         .tab-content.active {
-            display: block;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Loading and Error States */
@@ -953,6 +1003,7 @@ class WebServer {
             justify-content: center;
             padding: 40px;
             color: var(--secondary);
+            flex-shrink: 0;
         }
 
         .spinner {
@@ -977,6 +1028,7 @@ class WebServer {
             padding: 15px;
             border-radius: 6px;
             margin: 15px 0;
+            flex-shrink: 0;
         }
 
         .success-message {
@@ -986,6 +1038,7 @@ class WebServer {
             padding: 15px;
             border-radius: 6px;
             margin: 15px 0;
+            flex-shrink: 0;
         }
 
         /* Modal */
@@ -1230,13 +1283,25 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                             </div>
                         </div>
                     </div>
-                    <div id="output"></div>
+                    <div class="table-wrapper">
+                        <div class="table-container">
+                            <div class="table-scroll-container" id="output">
+                                <!-- Table content will be inserted here by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
                     <!-- Pagination will be inserted here by JavaScript -->
                 </div>
 
                 <div class="tab-content" id="schema-tab">
                     <h3>Table Schema</h3>
-                    <div id="schema-output"></div>
+                    <div class="table-wrapper">
+                        <div class="table-container">
+                            <div class="table-scroll-container" id="schema-output">
+                                <!-- Schema content will be inserted here by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="json-tab">
@@ -1379,7 +1444,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
         }
 
         function displaySchema(schema) {
-            let schemaHtml = '<div class="table-container"><table><thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Primary Key</th></tr></thead><tbody>';
+            let schemaHtml = '<table><thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Primary Key</th></tr></thead><tbody>';
             
             schema.forEach(column => {
                 schemaHtml += \`<tr>
@@ -1390,7 +1455,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 </tr>\`;
             });
             
-            schemaHtml += '</tbody></table></div>';
+            schemaHtml += '</tbody></table>';
             document.getElementById('schema-output').innerHTML = schemaHtml;
         }
 
@@ -1468,7 +1533,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
 
         function displayTable(data) {
             const headers = Object.keys(data[0]);
-            let tableHtml = '<div class="table-container"><table><thead><tr>';
+            let tableHtml = '<table><thead><tr>';
             
             headers.forEach(header => {
                 tableHtml += \`<th>\${header}</th>\`;
@@ -1503,7 +1568,7 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 tableHtml += '</tr>';
             });
 
-            tableHtml += '</tbody></table></div>';
+            tableHtml += '</tbody></table>';
             document.getElementById('output').innerHTML = tableHtml;
         }
 
@@ -1547,7 +1612,19 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
                 </div>
             \`;
             
-            document.getElementById('output').innerHTML += paginationHtml;
+            // Insert pagination after the table wrapper
+            const tableWrapper = document.querySelector('.table-wrapper');
+            if (tableWrapper.nextSibling) {
+                tableWrapper.parentNode.insertBefore(createElementFromHTML(paginationHtml), tableWrapper.nextSibling);
+            } else {
+                tableWrapper.parentNode.appendChild(createElementFromHTML(paginationHtml));
+            }
+        }
+
+        function createElementFromHTML(htmlString) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlString.trim();
+            return div.firstChild;
         }
 
         function generatePageButtons(totalPages) {
@@ -1591,9 +1668,6 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             
             currentPage = page;
             displayCurrentPage();
-            
-            // Scroll to top of results
-            document.getElementById('output').scrollIntoView({ behavior: 'smooth' });
         }
 
         function changePageSize(newSize) {
@@ -1656,6 +1730,12 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             currentData = [];
             totalRows = 0;
             currentPage = 1;
+            
+            // Remove any existing pagination
+            const existingPagination = document.querySelector('.pagination');
+            if (existingPagination) {
+                existingPagination.remove();
+            }
         }
 
         function formatQuery() {
