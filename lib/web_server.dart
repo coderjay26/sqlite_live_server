@@ -1523,14 +1523,19 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             const startIndex = (currentPage - 1) * pageSize;
             const endIndex = Math.min(startIndex + pageSize, totalRows);
             const pageData = currentData.slice(startIndex, endIndex);
-
+            removeExistingPagination();
             // Display the table
             displayTable(pageData);
             
             // Add pagination controls
             addPaginationControls(totalPages, startIndex, endIndex);
         }
-
+        function removeExistingPagination() {
+            const existingPagination = document.querySelector('.pagination');
+            if (existingPagination) {
+                existingPagination.remove();
+            }
+        }
         function displayTable(data) {
             const headers = Object.keys(data[0]);
             let tableHtml = '<table><thead><tr>';
@@ -1572,54 +1577,50 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             document.getElementById('output').innerHTML = tableHtml;
         }
 
-        function addPaginationControls(totalPages, startIndex, endIndex) {
-            const paginationHtml = \`
-                <div class="pagination">
-                    <div class="pagination-info">
-                        Showing \${startIndex + 1} to \${endIndex} of \${totalRows} entries
-                    </div>
-                    <div class="pagination-controls">
-                        <button class="pagination-btn" onclick="goToPage(1)" \${currentPage === 1 ? 'disabled' : ''}>
-                            <i class="fas fa-angle-double-left"></i>
-                        </button>
-                        <button class="pagination-btn" onclick="goToPage(\${currentPage - 1})" \${currentPage === 1 ? 'disabled' : ''}>
-                            <i class="fas fa-angle-left"></i>
-                        </button>
-                        
-                        <div class="pagination-pages">
-                            \${generatePageButtons(totalPages)}
-                        </div>
-                        
-                        <button class="pagination-btn" onclick="goToPage(\${currentPage + 1})" \${currentPage === totalPages ? 'disabled' : ''}>
-                            <i class="fas fa-angle-right"></i>
-                        </button>
-                        <button class="pagination-btn" onclick="goToPage(\${totalPages})" \${currentPage === totalPages ? 'disabled' : ''}>
-                            <i class="fas fa-angle-double-right"></i>
-                        </button>
-                    </div>
-                    <div class="pagination-settings">
-                        <select class="page-size-select" onchange="changePageSize(this.value)">
-                            <option value="10" \${pageSize === 10 ? 'selected' : ''}>10 per page</option>
-                            <option value="25" \${pageSize === 25 ? 'selected' : ''}>25 per page</option>
-                            <option value="50" \${pageSize === 50 ? 'selected' : ''}>50 per page</option>
-                            <option value="100" \${pageSize === 100 ? 'selected' : ''}>100 per page</option>
-                            <option value="250" \${pageSize === 250 ? 'selected' : ''}>250 per page</option>
-                        </select>
-                        <input type="number" class="page-input" min="1" max="\${totalPages}" value="\${currentPage}" 
-                               onchange="goToPage(parseInt(this.value))" onkeypress="handlePageInput(event)">
-                        <span>of \${totalPages}</span>
-                    </div>
+function addPaginationControls(totalPages, startIndex, endIndex) {
+    const paginationHtml = `
+        <div class="pagination">
+            <div class="pagination-info">
+                Showing \${startIndex + 1} to \${endIndex} of \${totalRows} entries
+            </div>
+            <div class="pagination-controls">
+                <button class="pagination-btn" onclick="goToPage(1)" \${currentPage === 1 ? 'disabled' : ''}>
+                    <i class="fas fa-angle-double-left"></i>
+                </button>
+                <button class="pagination-btn" onclick="goToPage(\${currentPage - 1})" \${currentPage === 1 ? 'disabled' : ''}>
+                    <i class="fas fa-angle-left"></i>
+                </button>
+                
+                <div class="pagination-pages">
+                    \${generatePageButtons(totalPages)}
                 </div>
-            \`;
-            
-            // Insert pagination after the table wrapper
-            const tableWrapper = document.querySelector('.table-wrapper');
-            if (tableWrapper.nextSibling) {
-                tableWrapper.parentNode.insertBefore(createElementFromHTML(paginationHtml), tableWrapper.nextSibling);
-            } else {
-                tableWrapper.parentNode.appendChild(createElementFromHTML(paginationHtml));
-            }
-        }
+                
+                <button class="pagination-btn" onclick="goToPage(\${currentPage + 1})" \${currentPage === totalPages ? 'disabled' : ''}>
+                    <i class="fas fa-angle-right"></i>
+                </button>
+                <button class="pagination-btn" onclick="goToPage(\${totalPages})" \${currentPage === totalPages ? 'disabled' : ''}>
+                    <i class="fas fa-angle-double-right"></i>
+                </button>
+            </div>
+            <div class="pagination-settings">
+                <select class="page-size-select" onchange="changePageSize(this.value)">
+                    <option value="10" \${pageSize === 10 ? 'selected' : ''}>10 per page</option>
+                    <option value="25" \${pageSize === 25 ? 'selected' : ''}>25 per page</option>
+                    <option value="50" \${pageSize === 50 ? 'selected' : ''}>50 per page</option>
+                    <option value="100" \${pageSize === 100 ? 'selected' : ''}>100 per page</option>
+                    <option value="250" \${pageSize === 250 ? 'selected' : ''}>250 per page</option>
+                </select>
+                <input type="number" class="page-input" min="1" max="\${totalPages}" value="\${currentPage}" 
+                       onchange="goToPage(parseInt(this.value))" onkeypress="handlePageInput(event)">
+                <span>of \${totalPages}</span>
+            </div>
+        </div>
+    `;
+    
+    // Insert pagination after the table wrapper
+    const tableWrapper = document.querySelector('.table-wrapper');
+    tableWrapper.insertAdjacentHTML('afterend', paginationHtml);
+}
 
         function createElementFromHTML(htmlString) {
             const div = document.createElement('div');
@@ -1732,12 +1733,8 @@ Example: SELECT * FROM users WHERE age > 25 ORDER BY name"></textarea>
             currentPage = 1;
             
             // Remove any existing pagination
-            const existingPagination = document.querySelector('.pagination');
-            if (existingPagination) {
-                existingPagination.remove();
-            }
+            removeExistingPagination();
         }
-
         function formatQuery() {
             const query = document.getElementById('query').value;
             // Basic formatting
