@@ -47,7 +47,7 @@ class WebServer {
 
       _server = await io.serve(handler, InternetAddress.anyIPv4, port);
       _isRunning = true;
-      
+
       print('\x1B[32m🚀 SQLite Pro Server started successfully!\x1B[0m');
       print('\x1B[36m📍 Local:   http://localhost:$port\x1B[0m');
       if (ipAddress != null) {
@@ -67,7 +67,8 @@ class WebServer {
           return Response.ok('', headers: {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
+            'Access-Control-Allow-Headers':
+                'Origin, Content-Type, Authorization',
           });
         }
         final response = await handler(request);
@@ -90,7 +91,9 @@ class WebServer {
         tablesWithInfo.add({'name': table, 'rowCount': count});
       }
       return _jsonResponse(tablesWithInfo);
-    } catch (e) { return _errorResponse(e.toString()); }
+    } catch (e) {
+      return _errorResponse(e.toString());
+    }
   }
 
   Future<Response> _getTableSchema(Request request) async {
@@ -98,7 +101,9 @@ class WebServer {
       var table = request.params['table']!;
       var schema = await dbService.getTableSchema(table);
       return _jsonResponse(schema);
-    } catch (e) { return _errorResponse(e.toString()); }
+    } catch (e) {
+      return _errorResponse(e.toString());
+    }
   }
 
   Future<Response> _getTableInfo(Request request) async {
@@ -106,10 +111,13 @@ class WebServer {
       var table = request.params['table']!;
       var info = await dbService.getTableInfo(table);
       return _jsonResponse(info);
-    } catch (e) { return _errorResponse(e.toString()); }
+    } catch (e) {
+      return _errorResponse(e.toString());
+    }
   }
 
-  Future<Response> _executeQuery(Request request) async => await _executeSqlQuery(request.url.queryParameters['sql']);
+  Future<Response> _executeQuery(Request request) async =>
+      await _executeSqlQuery(request.url.queryParameters['sql']);
   Future<Response> _executeQueryPost(Request request) async {
     final body = await request.readAsString();
     final json = jsonDecode(body);
@@ -129,30 +137,35 @@ class WebServer {
         'columns': data.isNotEmpty ? data[0].keys.toList() : [],
         'success': true
       });
-    } catch (e) { return _errorResponse(e.toString()); }
+    } catch (e) {
+      return _errorResponse(e.toString());
+    }
   }
 
   Future<Response> _getDatabaseInfo(Request request) async {
     try {
       var info = await dbService.getDatabaseInfo();
       var ip = await _getLocalIPAddress();
-      return _jsonResponse({
-        ...info,
-        'network_ip': ip,
-        'port': port
-      });
-    } catch (e) { return _errorResponse(e.toString()); }
+      return _jsonResponse({...info, 'network_ip': ip, 'port': port});
+    } catch (e) {
+      return _errorResponse(e.toString());
+    }
   }
 
   Future<Response> _getMetadata(Request request) async {
     try {
       var metadata = await dbService.getAllDatabaseMetadata();
       return _jsonResponse(metadata);
-    } catch (e) { return _errorResponse(e.toString()); }
+    } catch (e) {
+      return _errorResponse(e.toString());
+    }
   }
 
-  Response _jsonResponse(dynamic data) => Response.ok(jsonEncode(data), headers: {'Content-Type': 'application/json'});
-  Response _errorResponse(String error) => Response.ok(jsonEncode({'error': error, 'success': false}), headers: {'Content-Type': 'application/json'});
+  Response _jsonResponse(dynamic data) => Response.ok(jsonEncode(data),
+      headers: {'Content-Type': 'application/json'});
+  Response _errorResponse(String error) =>
+      Response.ok(jsonEncode({'error': error, 'success': false}),
+          headers: {'Content-Type': 'application/json'});
 
   Future<void> stopServer() async {
     if (_server != null) {
@@ -166,7 +179,8 @@ class WebServer {
     try {
       for (var iface in await NetworkInterface.list()) {
         for (var addr in iface.addresses) {
-          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) return addr.address;
+          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback)
+            return addr.address;
         }
       }
     } catch (_) {}
@@ -231,7 +245,7 @@ class WebServer {
         /* Layout */
         .nav-rail { width: 80px; background: rgba(0,0,0,0.4); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; align-items: center; padding: 30px 0; gap: 30px; backdrop-filter: blur(10px); }
         .sidebar { width: 320px; background: var(--glass); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; backdrop-filter: blur(24px); box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
-        .main { flex: 1; display: flex; flex-direction: column; position: relative; z-index: 1; }
+        .main { flex: 1; display: flex; flex-direction: column; position: relative; z-index: 1; overflow: hidden; }
 
         /* UI Elements */
         .avatar { width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(135deg, #6366f1, #a855f7); border: 2px solid var(--glass-border); }
@@ -255,9 +269,38 @@ class WebServer {
         .editor-section { padding: 32px 40px; display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
         .CodeMirror { height: 350px; background: transparent !important; font-family: 'JetBrains Mono', monospace; font-size: 14px; margin-top: 16px; border-radius: 16px; border: 1px solid var(--glass-border); }
 
-        .results-section { padding: 0 40px 32px; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .table-wrap { flex: 1; overflow: auto; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 20px; backdrop-filter: blur(40px); position: relative; }
-        table { min-width: max-content; width: 100%; border-collapse: collapse; table-layout: auto; }
+        .results-section { 
+            padding: 0 40px 32px; 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            min-height: 400px; 
+            transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .results-section.fullscreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 9999;
+            background: var(--bg);
+            padding: 40px;
+        }
+        .table-wrap { 
+            flex: 1; 
+            overflow: auto;   /* enables both horizontal and vertical scroll */
+            background: var(--glass); 
+            border: 1px solid var(--glass-border); 
+            border-radius: 20px; 
+            backdrop-filter: blur(40px); 
+            position: relative; 
+            min-height: 300px;     /* allows shrinking */
+        }
+        table {
+            border-collapse: collapse;
+            table-layout: auto;
+            width: max-content;   /* table expands to content width */
+            min-width: 100%;      /* fills container if content smaller */
+        }
         th { 
             background: rgba(3, 7, 18, 0.85); 
             backdrop-filter: blur(12px); 
@@ -274,15 +317,23 @@ class WebServer {
             white-space: nowrap; 
             z-index: 20; 
         }
-        td { padding: 14px 16px; border-bottom: 1px solid var(--glass-border); font-size: 14px; white-space: nowrap; transition: 0.2s; }
+        td { 
+            padding: 14px 16px; 
+            border-bottom: 1px solid var(--glass-border); 
+            font-size: 14px; 
+            white-space: nowrap; 
+            transition: 0.2s; 
+        }
         tr:hover td { background: rgba(99, 102, 241, 0.05); color: var(--accent); }
 
         .stat-card { display: flex; flex-direction: column; gap: 4px; padding: 20px; }
         .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); }
         .stat-val { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
 
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+        /* More visible scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
     </style>
 </head>
@@ -307,7 +358,7 @@ class WebServer {
         <div class="table-list" id="tables-list"></div>
     </div>
 
-        <div class="main">
+    <div class="main">
         <div class="top-bar">
             <div style="font-size: 14px; font-weight: 500; display: flex; flex-direction: column; gap: 4px;">
                 <div>Connection: <span id="db-status" style="color:var(--success)">Active</span></div>
@@ -349,9 +400,14 @@ class WebServer {
             </div>
         </div>
 
-        <div class="results-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="font-weight: 700; font-size: 1.1rem;">Data Explorer</h2>
+        <div class="results-section" id="results-sec">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <h2 style="font-weight: 700; font-size: 1.1rem;">Data Explorer</h2>
+                    <button class="btn" style="padding: 4px 12px; font-size: 11px; color: white; background: rgba(255,255,255,0.05);" onclick="toggleFullscreen()">
+                        <i class="fas fa-expand"></i> Full Screen
+                    </button>
+                </div>
                 <input type="text" id="result-filter" placeholder="Filter results..." style="background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); border-radius: 10px; padding: 8px 16px; color: white;" oninput="filterResults()">
             </div>
             <div class="table-wrap" id="results-table-container">
@@ -429,10 +485,17 @@ class WebServer {
 
         function selectTable(name) {
             const limit = document.getElementById('row-limit').value;
-            editor.setValue(\`SELECT * FROM \${name} LIMIT \${limit};\`);
+            editor.setValue(`SELECT * FROM \${name} LIMIT \${limit};`);
             runQuery();
             document.querySelectorAll('.table-item').forEach(i => i.classList.remove('active'));
             document.getElementById('table-' + name)?.classList.add('active');
+        }
+
+        function toggleFullscreen() {
+            const sec = document.getElementById('results-sec');
+            const isFull = sec.classList.toggle('fullscreen');
+            const btn = document.querySelector('[onclick="toggleFullscreen()"]');
+            btn.innerHTML = isFull ? '<i class="fas fa-compress"></i> Exit Full' : '<i class="fas fa-expand"></i> Full Screen';
         }
 
         async function runQuery() {
@@ -462,27 +525,105 @@ class WebServer {
             const res = currentResults;
             const filter = document.getElementById('result-filter').value.toLowerCase();
 
-            if (res.error) { container.innerHTML = \`<div style="padding:40px; color:var(--error);"><i class="fas fa-exclamation-triangle"></i> \${res.error}</div>\`; return; }
-            if (!res.data || res.data.length === 0) { container.innerHTML = '<div style="padding:40px; opacity:0.5;">No results found.</div>'; return; }
+            if (res.error) { 
+                container.innerHTML = `<div style="padding:40px; color:var(--error);"><i class="fas fa-exclamation-triangle"></i> \${res.error}</div>`; 
+                return; 
+            }
+            if (!res.data || res.data.length === 0) { 
+                container.innerHTML = '<div style="padding:40px; opacity:0.5;">No results found.</div>'; 
+                return; 
+            }
 
-            const filteredData = res.data.filter(row => 
+            // Determine columns – if backend doesn't send columns, infer from first row
+            let columns = res.columns;
+            if (!columns || columns.length === 0) {
+                const firstRow = res.data[0];
+                if (Array.isArray(firstRow)) {
+                    // If rows are arrays, create generic column names
+                    columns = firstRow.map((_, idx) => `col_\${idx + 1}`);
+                } else {
+                    columns = Object.keys(firstRow);
+                }
+            }
+
+            // Convert row data to objects if it's array-based
+            const normalizedData = res.data.map(row => {
+                if (Array.isArray(row)) {
+                    const obj = {};
+                    columns.forEach((col, idx) => { obj[col] = row[idx]; });
+                    return obj;
+                }
+                return row;
+            });
+
+            const filteredData = normalizedData.filter(row => 
                 Object.values(row).some(v => String(v).toLowerCase().includes(filter))
             );
 
-            const keys = res.columns || Object.keys(res.data[0]);
-            let html = '<table><thead><tr>' + keys.map(k => \`<th>\${k}</th>\`).join('') + '</tr></thead><tbody>';
+            let html = '<table><thead><tr>' + columns.map(k => `<th>\${escapeHtml(k)}</th>`).join('') + '</tr></thead><tbody>';
             filteredData.forEach(row => {
-                html += '<tr>' + keys.map(k => \`<td>\${row[k] ?? '<span style="opacity:0.2">NULL</span>'}</td>\`).join('') + '</tr>';
+                html += '<tr>' + columns.map(k => {
+                    let val = row[k];
+                    if (val === null || val === undefined) val = '<span style="opacity:0.4">NULL</span>';
+                    else val = escapeHtml(String(val));
+                    return `<td>\${val}</td>`;
+                }).join('') + '</tr>';
             });
             container.innerHTML = html + '</tbody></table>';
+        }
+
+        // Simple helper to prevent XSS
+        function escapeHtml(str) {
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+                return c;
+            });
         }
 
         function filterResults() { renderResults(); }
 
         function exportData(type) {
             if (!currentResults.data) return;
-            const keys = currentResults.columns || Object.keys(currentResults.data[0]);
-            const csv = [keys.join(','), ...currentResults.data.map(r => keys.map(k => '"' + (r[k]||'').toString().replace(/"/g, '""') + '"').join(','))].join('\\n');
+            
+            let data = currentResults.data;
+            let cols = currentResults.columns;
+            
+            if (!cols || cols.length === 0) {
+                if (data.length > 0) {
+                    if (Array.isArray(data[0])) {
+                        cols = data[0].map((_, i) => 'col_' + (i + 1));
+                    } else {
+                        cols = Object.keys(data[0]);
+                    }
+                }
+            }
+            
+            if (!cols || cols.length === 0) return;
+
+            let csvLines = [];
+            // Header
+            csvLines.push(cols.join(','));
+            
+            // Data
+            data.forEach(row => {
+                let rowVals = cols.map(k => {
+                    let val = row[k];
+                    if (Array.isArray(row)) {
+                        // If it's pure array from backend
+                        val = row[cols.indexOf(k)];
+                    }
+                    if (val === null || val === undefined) return '""';
+                    // Escape quotes for CSV
+                    return '"' + String(val).replace(/"/g, '""') + '"';
+                });
+                csvLines.push(rowVals.join(','));
+            });
+            
+            const csv = csvLines.join('\\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
@@ -491,6 +632,5 @@ class WebServer {
         }
     </script>
 </body>
-</html>
-''';
+</html>''';
 }
