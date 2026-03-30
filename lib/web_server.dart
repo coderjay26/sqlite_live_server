@@ -5,8 +5,6 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
-import 'package:shelf_web_socket/shelf_web_socket.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 import 'sqlite_service.dart';
 
 class WebServer {
@@ -25,7 +23,7 @@ class WebServer {
         return true;
       }
 
-      String? ipAddress = await _getLocalIPAddress();
+      await _getLocalIPAddress();
       var router = Router();
 
       // API Routes
@@ -34,24 +32,8 @@ class WebServer {
       router.get('/api/tables/<table>/info', _getTableInfo);
       router.get('/api/query', _executeQuery);
       router.post('/api/query', _executeQueryPost);
-      router.post('/api/tables/<table>/data', _insertData);
-      router.put('/api/tables/<table>/data', _updateData);
-      router.delete('/api/tables/<table>/data', _deleteData);
       router.get('/api/database/info', _getDatabaseInfo);
-      router.get('/api/export/<table>', _exportTable);
-      router.get('/api/history', _getQueryHistory);
       router.get('/api/metadata', _getMetadata);
-
-      // WebSocket
-      if (enableWebSocket) {
-        router.get('/ws', webSocketHandler((WebSocketChannel webSocket) {
-          webSocket.stream.listen(
-            (message) => _handleWebSocketMessage(webSocket, message),
-            onError: (error) => print('WebSocket error: $error'),
-            onDone: () => print('WebSocket disconnected'),
-          );
-        }));
-      }
 
       // Serve UI
       router.get('/', (Request request) {
@@ -68,23 +50,10 @@ class WebServer {
       
       print('\x1B[32m🚀 SQLite Pro Server started successfully!\x1B[0m');
       print('\x1B[36m📍 Local: http://localhost:$port\x1B[0m');
-      if (ipAddress != null) {
-        print('\x1B[36m🌐 Network: http://$ipAddress:$port\x1B[0m');
-      }
       return true;
     } catch (e) {
       print('\x1B[31m🚨 Failed to start server: $e\x1B[0m');
       return false;
-    }
-  }
-
-  Future<bool> _isPortInUse(int port) async {
-    try {
-      var server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
-      await server.close();
-      return false;
-    } catch (e) {
-      return true;
     }
   }
 
@@ -108,19 +77,17 @@ class WebServer {
     };
   }
 
-  // API Handlers
+  // API Handlers (Internal methods kept as is)
   Future<Response> _getTables(Request request) async {
     try {
       var tables = await dbService.getTables();
       var tablesWithInfo = <Map<String, dynamic>>[];
       for (var table in tables) {
         var count = await dbService.getTableRowCount(table);
-        tablesWithInfo.add({'name': table, 'rowCount': count, 'type': 'table'});
+        tablesWithInfo.add({'name': table, 'rowCount': count});
       }
       return _jsonResponse(tablesWithInfo);
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
+    } catch (e) { return _errorResponse(e.toString()); }
   }
 
   Future<Response> _getTableSchema(Request request) async {
@@ -128,9 +95,7 @@ class WebServer {
       var table = request.params['table']!;
       var schema = await dbService.getTableSchema(table);
       return _jsonResponse(schema);
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
+    } catch (e) { return _errorResponse(e.toString()); }
   }
 
   Future<Response> _getTableInfo(Request request) async {
@@ -138,154 +103,48 @@ class WebServer {
       var table = request.params['table']!;
       var info = await dbService.getTableInfo(table);
       return _jsonResponse(info);
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
+    } catch (e) { return _errorResponse(e.toString()); }
   }
 
-  Future<Response> _executeQuery(Request request) async {
-    final sql = request.url.queryParameters['sql'];
-    return await _executeSqlQuery(sql);
-  }
-
+  Future<Response> _executeQuery(Request request) async => await _executeSqlQuery(request.url.queryParameters['sql']);
   Future<Response> _executeQueryPost(Request request) async {
     final body = await request.readAsString();
     final json = jsonDecode(body);
-    final sql = json['sql'] as String?;
-    return await _executeSqlQuery(sql);
+    return await _executeSqlQuery(json['sql']);
   }
 
   Future<Response> _executeSqlQuery(String? sql) async {
-    if (sql == null || sql.isEmpty) {
-      return Response.badRequest(body: jsonEncode({'error': 'SQL query is required'}));
-    }
+    if (sql == null || sql.isEmpty) return _errorResponse('SQL query required');
     try {
-      final stopwatch = Stopwatch()..start();
+      final watch = Stopwatch()..start();
       var data = await dbService.query(sql);
-      stopwatch.stop();
-      _addToQueryHistory(sql, data.length, stopwatch.elapsedMilliseconds);
+      watch.stop();
       return _jsonResponse({
         'data': data,
         'rowCount': data.length,
-        'executionTime': stopwatch.elapsedMilliseconds,
+        'executionTime': watch.elapsedMilliseconds,
         'columns': data.isNotEmpty ? data[0].keys.toList() : [],
         'success': true
       });
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
-  }
-
-  Future<Response> _insertData(Request request) async {
-    try {
-      var table = request.params['table']!;
-      var data = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-      var result = await dbService.insert(table, data);
-      return _jsonResponse({'success': true, 'insertedId': result});
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
-  }
-
-  Future<Response> _updateData(Request request) async {
-    try {
-      var table = request.params['table']!;
-      var data = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-      var where = request.url.queryParameters['where'];
-      var affectedRows = await dbService.update(table, data, where: where);
-      return _jsonResponse({'success': true, 'affectedRows': affectedRows});
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
-  }
-
-  Future<Response> _deleteData(Request request) async {
-    try {
-      var table = request.params['table']!;
-      var where = request.url.queryParameters['where'];
-      var affectedRows = await dbService.delete(table, where: where);
-      return _jsonResponse({'success': true, 'affectedRows': affectedRows});
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
+    } catch (e) { return _errorResponse(e.toString()); }
   }
 
   Future<Response> _getDatabaseInfo(Request request) async {
     try {
       var info = await dbService.getDatabaseInfo();
       return _jsonResponse(info);
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
-  }
-
-  Future<Response> _exportTable(Request request) async {
-    try {
-      var table = request.params['table']!;
-      var format = request.url.queryParameters['format'] ?? 'json';
-      var data = await dbService.query('SELECT * FROM $table');
-      if (format == 'csv') return _csvResponse(_convertToCsv(data), table);
-      return _jsonResponse(data);
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
+    } catch (e) { return _errorResponse(e.toString()); }
   }
 
   Future<Response> _getMetadata(Request request) async {
     try {
       var metadata = await dbService.getAllDatabaseMetadata();
       return _jsonResponse(metadata);
-    } catch (e) {
-      return _errorResponse(e.toString());
-    }
-  }
-
-  Future<Response> _getQueryHistory(Request request) async {
-    return _jsonResponse(_queryHistory.reversed.toList());
-  }
-
-  void _handleWebSocketMessage(WebSocketChannel webSocket, dynamic message) {
-    try {
-      var json = jsonDecode(message);
-      if (json['action'] == 'execute_query') {
-        _executeQueryAndSend(webSocket, json['sql']);
-      }
-    } catch (e) {
-      webSocket.sink.add(jsonEncode({'error': e.toString()}));
-    }
-  }
-
-  void _executeQueryAndSend(WebSocketChannel webSocket, String sql) async {
-    try {
-      var data = await dbService.query(sql);
-      webSocket.sink.add(jsonEncode({'type': 'query_result', 'data': data, 'rowCount': data.length}));
-    } catch (e) {
-      webSocket.sink.add(jsonEncode({'error': e.toString()}));
-    }
+    } catch (e) { return _errorResponse(e.toString()); }
   }
 
   Response _jsonResponse(dynamic data) => Response.ok(jsonEncode(data), headers: {'Content-Type': 'application/json'});
-  Response _errorResponse(String error) => Response.internalServerError(body: jsonEncode({'error': error, 'success': false}), headers: {'Content-Type': 'application/json'});
-  Response _csvResponse(String csvData, String tableName) => Response.ok(csvData, headers: {'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="$tableName.csv"'});
-
-  String _convertToCsv(List<Map<String, dynamic>> data) {
-    if (data.isEmpty) return '';
-    var headers = data[0].keys;
-    var csv = StringBuffer()..writeln(headers.join(','));
-    for (var row in data) {
-      csv.writeln(headers.map((h) {
-        var v = row[h]?.toString() ?? '';
-        return v.contains(',') || v.contains('"') ? '"${v.replaceAll('"', '""')}"' : v;
-      }).join(','));
-    }
-    return csv.toString();
-  }
-
-  final List<Map<String, dynamic>> _queryHistory = [];
-  void _addToQueryHistory(String sql, int rowCount, int executionTime) {
-    _queryHistory.add({'sql': sql, 'rowCount': rowCount, 'executionTime': executionTime, 'timestamp': DateTime.now().toIso8601String()});
-    if (_queryHistory.length > 100) _queryHistory.removeAt(0);
-  }
+  Response _errorResponse(String error) => Response.ok(jsonEncode({'error': error, 'success': false}), headers: {'Content-Type': 'application/json'});
 
   Future<void> stopServer() async {
     if (_server != null) {
@@ -297,8 +156,8 @@ class WebServer {
 
   Future<String?> _getLocalIPAddress() async {
     try {
-      for (var interface in await NetworkInterface.list()) {
-        for (var addr in interface.addresses) {
+      for (var iface in await NetworkInterface.list()) {
+        for (var addr in iface.addresses) {
           if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) return addr.address;
         }
       }
@@ -312,16 +171,15 @@ class WebServer {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQLite Pro | Premium Database Manager</title>
+    <title>Nexus SQL Pro | Glassmorphic Experience</title>
     
-    <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- CodeMirror -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.css">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/sql/sql.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.js"></script>
@@ -329,14 +187,13 @@ class WebServer {
 
     <style>
         :root {
-            --bg: #0f172a;
-            --sidebar-bg: #1e293b;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.5);
-            --text: #f1f5f9;
+            --bg: #030712;
+            --glass: rgba(17, 25, 40, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.125);
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.5);
+            --text: #f8fafc;
             --text-dim: #94a3b8;
-            --glass: rgba(30, 41, 59, 0.7);
-            --border: rgba(255, 255, 255, 0.1);
             --success: #10b981;
             --error: #ef4444;
         }
@@ -347,360 +204,253 @@ class WebServer {
             background: var(--bg);
             color: var(--text);
             height: 100vh;
-            display: flex;
             overflow: hidden;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            width: 300px;
-            background: var(--sidebar-bg);
-            border-right: 1px solid var(--border);
+            position: relative;
             display: flex;
-            flex-direction: column;
-            backdrop-filter: blur(10px);
         }
 
-        .sidebar-header {
-            padding: 24px;
-            border-bottom: 1px solid var(--border);
-            background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.1), transparent);
+        /* Animated Blobs */
+        .blob {
+            position: absolute; width: 400px; height: 400px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            border-radius: 50%; filter: blur(80px); z-index: -1; animation: float 20s infinite alternate;
+        }
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(100px, 100px) scale(1.2); }
         }
 
-        .logo {
-            font-size: 24px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            color: var(--accent);
-            text-shadow: 0 0 20px var(--accent-glow);
-        }
+        /* Layout */
+        .nav-rail { width: 80px; background: rgba(0,0,0,0.4); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; align-items: center; padding: 30px 0; gap: 30px; backdrop-filter: blur(10px); }
+        .sidebar { width: 320px; background: var(--glass); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; backdrop-filter: blur(24px); box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .main { flex: 1; display: flex; flex-direction: column; position: relative; z-index: 1; }
 
-        .db-badge {
-            background: rgba(59, 130, 246, 0.2);
-            color: var(--accent);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            margin-top: 12px;
-            display: inline-block;
-            border: 1px solid var(--accent);
-        }
+        /* UI Elements */
+        .avatar { width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(135deg, #6366f1, #a855f7); border: 2px solid var(--glass-border); }
+        .nav-icon { color: var(--text-dim); font-size: 22px; cursor: pointer; transition: 0.3s; }
+        .nav-icon:hover, .nav-icon.active { color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); }
 
-        .tables-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-        }
+        .search-area { padding: 24px; }
+        .search-input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px 16px; color: white; outline: none; }
+        .table-list { flex: 1; overflow-y: auto; padding: 0 16px 24px; }
+        .table-item { padding: 12px 16px; border-radius: 14px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 12px; margin-bottom: 6px; border: 1px solid transparent; }
+        .table-item:hover { background: rgba(255,255,255,0.08); border-color: var(--glass-border); }
+        .table-item.active { background: rgba(99, 102, 241, 0.2); border-color: var(--accent); }
 
-        .table-item {
-            padding: 12px 16px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border: 1px solid transparent;
-        }
+        .top-bar { padding: 24px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); }
+        .btn { padding: 10px 24px; border-radius: 12px; border: 1px solid var(--glass-border); cursor: pointer; transition: 0.3s; font-weight: 600; display: flex; align-items: center; gap: 8px; font-family: inherit; }
+        .btn-primary { background: var(--accent); color: white; box-shadow: 0 8px 16px-4px var(--accent-glow); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 20px -4px var(--accent-glow); }
 
-        .table-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: var(--border);
-            transform: translateX(4px);
-        }
+        /* Glass Cards */
+        .glass-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 24px; backdrop-filter: blur(32px); padding: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); }
+        .editor-section { padding: 32px 40px; display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
+        .CodeMirror { height: 350px; background: transparent !important; font-family: 'JetBrains Mono', monospace; font-size: 14px; margin-top: 16px; border-radius: 16px; border: 1px solid var(--glass-border); }
 
-        .table-item.active {
-            background: var(--accent);
-            color: white;
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
-        }
-
-        /* Main Content */
-        .main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.05), transparent);
-        }
-
-        .header {
-            padding: 20px 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border-radius: 12px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-family: inherit;
-        }
-
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px var(--accent-glow); }
-        
-        /* Editor Section */
-        .editor-container {
-            padding: 24px 40px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .CodeMirror {
-            height: 380px;
-            border-radius: 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            padding: 10px;
-            border: 1px solid var(--border);
-            background: var(--glass) !important;
-            backdrop-filter: blur(8px);
-        }
-
-        .toolbar {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        /* Results Section */
-        .results-container {
-            flex: 1;
-            padding: 0 40px 24px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: var(--glass);
-            border: 1px solid var(--border);
-            padding: 16px;
-            border-radius: 16px;
-            backdrop-filter: blur(8px);
-        }
-
-        .stat-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
-        .stat-value { font-size: 20px; font-weight: 600; margin-top: 4px; }
-
-        .table-wrapper {
-            flex: 1;
-            background: var(--glass);
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            overflow: auto;
-            backdrop-filter: blur(12px);
-        }
-
+        .results-section { padding: 0 40px 32px; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .table-wrap { flex: 1; overflow: auto; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 20px; backdrop-filter: blur(40px); }
         table { width: 100%; border-collapse: collapse; }
-        th { 
-            position: sticky; top: 0; background: var(--sidebar-bg); 
-            padding: 16px; text-align: left; font-weight: 600; 
-            border-bottom: 1px solid var(--border); z-index: 10;
-        }
-        td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-dim); }
-        tr:hover td { color: var(--text); background: rgba(255, 255, 255, 0.02); }
+        th { background: rgba(3, 7, 18, 0.8); padding: 16px; text-align: left; font-weight: 600; color: var(--text-dim); border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--glass-border); font-size: 14px; }
+        tr:hover { background: rgba(255,255,255,0.03); }
 
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+        .stat-card { display: flex; flex-direction: column; gap: 4px; padding: 20px; }
+        .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); }
+        .stat-val { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
-
-        .hint-text { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
     </style>
 </head>
 <body>
+    <div class="blob" style="top: -100px; left: -100px; background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%);"></div>
+    <div class="blob" style="bottom: -150px; right: -150px; background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 70%);"></div>
+
+    <div class="nav-rail">
+        <div class="avatar"></div>
+        <i class="fas fa-database nav-icon active"></i>
+        <i class="fas fa-terminal nav-icon"></i>
+        <i class="fas fa-history nav-icon"></i>
+        <div style="flex: 1"></div>
+        <i class="fas fa-cog nav-icon"></i>
+    </div>
+
     <div class="sidebar">
-        <div class="sidebar-header">
-            <div class="logo"><i class="fas fa-bolt"></i> SQLite Pro</div>
-            <div class="db-badge" id="db-name-badge">Loading...</div>
+        <div style="padding: 32px 24px 8px; font-weight: 800; font-size: 1.3rem; letter-spacing: -0.5px;">Nexus <span style="color:var(--accent)">SQL</span></div>
+        <div class="search-area">
+            <input type="text" class="search-input" id="table-search" placeholder="Search tables..." oninput="filterTables()">
         </div>
-        <div class="tables-list" id="tables-list">
-            <!-- Tables will be loaded here -->
-        </div>
+        <div class="table-list" id="tables-list"></div>
     </div>
 
     <div class="main">
-        <div class="header">
-            <h1>Query Explorer</h1>
-            <div class="toolbar">
-                <button class="btn btn-primary" onclick="runQuery()">
-                    <i class="fas fa-play"></i> Run Selection
-                </button>
+        <div class="top-bar">
+            <div style="font-size: 14px; font-weight: 500;">Connection: <span id="db-status" style="color:var(--success)">Active</span></div>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn" style="background:transparent;" onclick="exportData('csv')"><i class="fas fa-file-csv"></i> Export</button>
+                <button class="btn btn-primary" onclick="runQuery()"><i class="fas fa-play"></i> Execute Query</button>
             </div>
         </div>
 
-        <div class="editor-container">
-            <textarea id="sql-editor"></textarea>
-            <div class="hint-text">
-                <i class="fas fa-info-circle"></i> Shortcut: <strong>Ctrl + Enter</strong> to run selection.
-            </div>
-        </div>
-
-        <div class="results-container">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Rows Affected</div>
-                    <div class="stat-value" id="stat-rows">0</div>
+        <div class="editor-section">
+            <div class="glass-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 600;">SQL Workbench</span>
+                    <select id="row-limit" style="background:transparent; color:white; border:none; font-size: 12px; cursor:pointer;">
+                        <option value="50">Limit 50</option>
+                        <option value="100">Limit 100</option>
+                        <option value="500">Limit 500</option>
+                        <option value="999999">No Limit</option>
+                    </select>
                 </div>
-                <div class="stat-card">
+                <textarea id="sql-editor"></textarea>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="glass-card stat-card">
                     <div class="stat-label">Execution Time</div>
-                    <div class="stat-value" id="stat-time">0 ms</div>
+                    <div class="stat-val" id="res-time">0 ms</div>
                 </div>
-                <div class="stat-card">
+                <div class="glass-card stat-card">
+                    <div class="stat-label">Rows Loaded</div>
+                    <div class="stat-val" id="res-count">0</div>
+                </div>
+                <div class="glass-card stat-card">
                     <div class="stat-label">Columns</div>
-                    <div class="stat-value" id="stat-cols">0</div>
+                    <div class="stat-val" id="res-cols">0</div>
                 </div>
             </div>
+        </div>
 
-            <div class="table-wrapper" id="results-table-wrapper">
-                <table id="results-table">
-                    <!-- Results will be loaded here -->
-                </table>
+        <div class="results-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="font-weight: 700; font-size: 1.1rem;">Data Explorer</h2>
+                <input type="text" id="result-filter" placeholder="Filter results..." style="background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); border-radius: 10px; padding: 8px 16px; color: white;" oninput="filterResults()">
+            </div>
+            <div class="table-wrap" id="results-table-container">
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; opacity:0.3;">
+                    <i class="fas fa-table" style="font-size: 3rem; margin-bottom: 16px;"></i>
+                    <p>Execute a SQL query to see the magic</p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let editor;
-        let metadata = {};
+        let editor, allTables = [], currentResults = {}, metadata = {};
 
         document.addEventListener('DOMContentLoaded', async () => {
             initEditor();
-            await loadMetadata();
-            await loadDatabaseInfo();
-            await loadTables();
+            await loadAll();
         });
+
+        async function loadAll() {
+            const [tRes, mRes] = await Promise.all([fetch('/api/tables'), fetch('/api/metadata')]);
+            allTables = await tRes.json();
+            metadata = await mRes.json();
+            renderTables(allTables);
+            if (editor) editor.setOption('hintOptions', { tables: metadata });
+        }
 
         function initEditor() {
             editor = CodeMirror.fromTextArea(document.getElementById('sql-editor'), {
-                mode: 'text/x-sql',
-                theme: 'dracula',
-                lineNumbers: true,
-                indentWithTabs: true,
-                smartIndent: true,
-                matchBrackets: true,
-                autofocus: true,
-                extraKeys: {
+                mode: 'text/x-sql', theme: 'dracula', lineNumbers: true, matchBrackets: true,
+                extraKeys: { 
                     "Ctrl-Space": "autocomplete",
-                    "Ctrl-Enter": () => runQuery()
+                    "Ctrl-Enter": () => runQuery(),
+                    "Cmd-Enter": () => runQuery()
                 },
-                hintOptions: {
-                    tables: metadata
+                hintOptions: { tables: metadata }
+            });
+            editor.setValue("SELECT * FROM sqlite_master;");
+
+            // Auto-trigger hints on typing
+            editor.on("inputRead", function(cm, change) {
+                if (change.origin !== "+input") return;
+                const str = change.text[0];
+                if (/[a-zA-Z._]/.test(str)) {
+                    cm.showHint({ completeSingle: false });
                 }
             });
-
-            editor.setValue("SELECT * FROM sqlite_master;");
         }
 
-        async function loadMetadata() {
-            try {
-                const res = await fetch('/api/metadata');
-                metadata = await res.json();
-                if (editor) editor.setOption('hintOptions', { tables: metadata });
-            } catch (e) { console.error("Metadata load failed", e); }
+        function renderTables(tables) {
+            document.getElementById('tables-list').innerHTML = tables.map(t => `
+                <div class="table-item" onclick="selectTable('\${t.name}')" id="table-\${t.name}">
+                    <i class="fas fa-table" style="opacity:0.5;"></i>
+                    <span style="flex:1;">\${t.name}</span>
+                    <span style="font-size:10px; opacity:0.3;">\${t.rowCount}</span>
+                </div>
+            `).join('');
         }
 
-        async function loadDatabaseInfo() {
-            try {
-                const res = await fetch('/api/database/info');
-                const info = await res.json();
-                document.getElementById('db-name-badge').textContent = info.name;
-            } catch (e) {}
-        }
-
-        async function loadTables() {
-            try {
-                const res = await fetch('/api/tables');
-                const tables = await res.json();
-                const list = document.getElementById('tables-list');
-                list.innerHTML = tables.map(t => `
-                    <div class="table-item" onclick="selectTable('\${t.name}')">
-                        <i class="fas fa-table"></i>
-                        <span>\${t.name}</span>
-                        <span style="margin-left: auto; font-size: 10px; opacity: 0.5">\${t.rowCount}</span>
-                    </div>
-                `).join('');
-            } catch (e) {}
+        function filterTables() {
+            const q = document.getElementById('table-search').value.toLowerCase();
+            renderTables(allTables.filter(t => t.name.toLowerCase().includes(q)));
         }
 
         function selectTable(name) {
-            editor.setValue(\`SELECT * FROM \${name} LIMIT 100;\`);
+            const limit = document.getElementById('row-limit').value;
+            editor.setValue(\`SELECT * FROM \${name} LIMIT \${limit};\`);
             runQuery();
-            document.querySelectorAll('.table-item').forEach(el => {
-                el.classList.toggle('active', el.textContent.includes(name));
-            });
+            document.querySelectorAll('.table-item').forEach(i => i.classList.remove('active'));
+            document.getElementById('table-' + name)?.classList.add('active');
         }
 
         async function runQuery() {
-            const selection = editor.getSelection().trim();
-            const query = selection || editor.getValue().trim();
+            const sql = editor.getSelection().trim() || editor.getValue().trim();
+            if (!sql) return;
+
+            document.getElementById('results-table-container').innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
             
-            if (!query) return;
+            const start = performance.now();
+            const res = await fetch('/api/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql })
+            });
+            currentResults = await res.json();
+            const end = performance.now();
 
-            const startTime = performance.now();
-            try {
-                const res = await fetch('/api/query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sql: query })
-                });
-                const result = await res.json();
-                const endTime = performance.now();
-
-                displayResults(result, Math.round(endTime - startTime));
-            } catch (e) {
-                alert("Query failed: " + e.message);
-            }
+            document.getElementById('res-time').textContent = (currentResults.executionTime || Math.round(end-start)) + " ms";
+            document.getElementById('res-count').textContent = currentResults.rowCount || 0;
+            document.getElementById('res-cols').textContent = (currentResults.columns || []).length;
+            
+            renderResults();
         }
 
-        function displayResults(result, time) {
-            document.getElementById('stat-rows').textContent = result.rowCount || 0;
-            document.getElementById('stat-time').textContent = (result.executionTime || time) + " ms";
-            document.getElementById('stat-cols').textContent = result.columns ? result.columns.length : 0;
+        function renderResults() {
+            const container = document.getElementById('results-table-container');
+            const res = currentResults;
+            const filter = document.getElementById('result-filter').value.toLowerCase();
 
-            if (result.error) {
-                document.getElementById('results-table-wrapper').innerHTML = \`<div style="padding: 40px; color: var(--error)">
-                    <i class="fas fa-exclamation-triangle"></i> \${result.error}
-                </div>\`;
-                return;
-            }
+            if (res.error) { container.innerHTML = \`<div style="padding:40px; color:var(--error);"><i class="fas fa-exclamation-triangle"></i> \${res.error}</div>\`; return; }
+            if (!res.data || res.data.length === 0) { container.innerHTML = '<div style="padding:40px; opacity:0.5;">No results found.</div>'; return; }
 
-            if (!result.data || result.data.length === 0) {
-                document.getElementById('results-table-wrapper').innerHTML = \`<div style="padding: 40px; text-align: center; color: var(--text-dim)">
-                    No data returned.
-                </div>\`;
-                return;
-            }
+            const filteredData = res.data.filter(row => 
+                Object.values(row).some(v => String(v).toLowerCase().includes(filter))
+            );
 
-            const cols = result.columns;
-            let html = '<table><thead><tr>' + cols.map(c => \`<th>\${c}</th>\`).join('') + '</tr></thead><tbody>';
-            
-            result.data.forEach(row => {
-                html += '<tr>' + cols.map(c => \`<td>\${row[c] !== null ? row[c] : '<span style="opacity: 0.3">NULL</span>'}</td>\`).join('') + '</tr>';
+            const keys = res.columns || Object.keys(res.data[0]);
+            let html = '<table><thead><tr>' + keys.map(k => \`<th>\${k}</th>\`).join('') + '</tr></thead><tbody>';
+            filteredData.forEach(row => {
+                html += '<tr>' + keys.map(k => \`<td>\${row[k] ?? '<span style="opacity:0.2">NULL</span>'}</td>\`).join('') + '</tr>';
             });
-            html += '</tbody></table>';
+            container.innerHTML = html + '</tbody></table>';
+        }
 
-            document.getElementById('results-table-wrapper').innerHTML = html;
+        function filterResults() { renderResults(); }
+
+        function exportData(type) {
+            if (!currentResults.data) return;
+            const keys = currentResults.columns || Object.keys(currentResults.data[0]);
+            const csv = [keys.join(','), ...currentResults.data.map(r => keys.map(k => '"' + (r[k]||'').toString().replace(/"/g, '""') + '"').join(','))].join('\\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'nexus_export.csv';
+            link.click();
         }
     </script>
 </body>
