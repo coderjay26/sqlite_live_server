@@ -258,9 +258,24 @@ class WebServer {
         .results-section { padding: 0 40px 32px; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         .table-wrap { flex: 1; overflow: auto; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 20px; backdrop-filter: blur(40px); position: relative; }
         table { min-width: max-content; width: 100%; border-collapse: collapse; table-layout: auto; }
-        th { background: rgba(3, 7, 18, 0.95); padding: 16px; text-align: left; font-weight: 600; color: var(--text-dim); border-bottom: 20px solid transparent; border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; white-space: nowrap; z-index: 10; }
-        td { padding: 14px 16px; border-bottom: 1px solid var(--glass-border); font-size: 14px; white-space: nowrap; }
-        tr:hover { background: rgba(255,255,255,0.03); }
+        th { 
+            background: rgba(3, 7, 18, 0.85); 
+            backdrop-filter: blur(12px); 
+            padding: 18px 16px; 
+            text-align: left; 
+            font-weight: 700; 
+            color: var(--text-dim); 
+            text-transform: uppercase; 
+            letter-spacing: 0.8px; 
+            font-size: 11px; 
+            border-bottom: 2px solid var(--glass-border); 
+            position: sticky; 
+            top: 0; 
+            white-space: nowrap; 
+            z-index: 20; 
+        }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--glass-border); font-size: 14px; white-space: nowrap; transition: 0.2s; }
+        tr:hover td { background: rgba(99, 102, 241, 0.05); color: var(--accent); }
 
         .stat-card { display: flex; flex-direction: column; gap: 4px; padding: 20px; }
         .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); }
