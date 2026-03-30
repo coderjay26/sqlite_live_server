@@ -23,7 +23,7 @@ class WebServer {
         return true;
       }
 
-      await _getLocalIPAddress();
+      String? ipAddress = await _getLocalIPAddress();
       var router = Router();
 
       // API Routes
@@ -49,7 +49,10 @@ class WebServer {
       _isRunning = true;
       
       print('\x1B[32m🚀 SQLite Pro Server started successfully!\x1B[0m');
-      print('\x1B[36m📍 Local: http://localhost:$port\x1B[0m');
+      print('\x1B[36m📍 Local:   http://localhost:$port\x1B[0m');
+      if (ipAddress != null) {
+        print('\x1B[36m📍 Network: http://$ipAddress:$port\x1B[0m');
+      }
       return true;
     } catch (e) {
       print('\x1B[31m🚨 Failed to start server: $e\x1B[0m');
@@ -132,7 +135,12 @@ class WebServer {
   Future<Response> _getDatabaseInfo(Request request) async {
     try {
       var info = await dbService.getDatabaseInfo();
-      return _jsonResponse(info);
+      var ip = await _getLocalIPAddress();
+      return _jsonResponse({
+        ...info,
+        'network_ip': ip,
+        'port': port
+      });
     } catch (e) { return _errorResponse(e.toString()); }
   }
 
@@ -284,9 +292,12 @@ class WebServer {
         <div class="table-list" id="tables-list"></div>
     </div>
 
-    <div class="main">
+        <div class="main">
         <div class="top-bar">
-            <div style="font-size: 14px; font-weight: 500;">Connection: <span id="db-status" style="color:var(--success)">Active</span></div>
+            <div style="font-size: 14px; font-weight: 500; display: flex; flex-direction: column; gap: 4px;">
+                <div>Connection: <span id="db-status" style="color:var(--success)">Active</span></div>
+                <div id="db-path" style="font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono';">Unknown</div>
+            </div>
             <div style="display: flex; gap: 12px;">
                 <button class="btn" style="background:transparent;" onclick="exportData('csv')"><i class="fas fa-file-csv"></i> Export</button>
                 <button class="btn btn-primary" onclick="runQuery()"><i class="fas fa-play"></i> Execute Query</button>
@@ -346,9 +357,20 @@ class WebServer {
         });
 
         async function loadAll() {
-            const [tRes, mRes] = await Promise.all([fetch('/api/tables'), fetch('/api/metadata')]);
+            const [tRes, mRes, iRes] = await Promise.all([
+                fetch('/api/tables'), 
+                fetch('/api/metadata'),
+                fetch('/api/database/info')
+            ]);
             allTables = await tRes.json();
             metadata = await mRes.json();
+            const dbInfo = await iRes.json();
+
+            document.getElementById('db-path').textContent = dbInfo.path;
+            if (dbInfo.network_ip) {
+                document.getElementById('db-status').innerHTML = `<i class="fas fa-network-wired"></i> http://\${dbInfo.network_ip}:\${dbInfo.port}`;
+            }
+
             renderTables(allTables);
             if (editor) editor.setOption('hintOptions', { tables: metadata });
         }
