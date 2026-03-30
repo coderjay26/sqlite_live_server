@@ -34,6 +34,7 @@ class WebServer {
       router.post('/api/query', _executeQueryPost);
       router.get('/api/database/info', _getDatabaseInfo);
       router.get('/api/metadata', _getMetadata);
+      router.post('/api/database/upload', _handleDbUpload);
 
       // Serve UI
       router.get('/', (Request request) {
@@ -161,6 +162,22 @@ class WebServer {
     }
   }
 
+  Future<Response> _handleDbUpload(Request request) async {
+    try {
+      final bytes = await request.read().expand((b) => b).toList();
+      if (bytes.isEmpty) return _errorResponse('Empty database file');
+
+      await dbService.close();
+      final file = File(await dbService.getDatabaseInfo().then((i) => i['path']));
+      await file.writeAsBytes(bytes);
+      
+      // The getter will automatically reopen it on next access
+      return _jsonResponse({'success': true, 'message': 'Database updated'});
+    } catch (e) {
+      return _errorResponse(e.toString());
+    }
+  }
+
   Response _jsonResponse(dynamic data) => Response.ok(jsonEncode(data),
       headers: {'Content-Type': 'application/json'});
   Response _errorResponse(String error) =>
@@ -260,7 +277,7 @@ class WebServer {
         .table-item.active { background: rgba(99, 102, 241, 0.2); border-color: var(--accent); }
 
         .top-bar { padding: 24px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); }
-        .btn { padding: 10px 24px; border-radius: 12px; border: 1px solid var(--glass-border); cursor: pointer; transition: 0.3s; font-weight: 600; display: flex; align-items: center; gap: 8px; font-family: inherit; }
+        .btn { padding: 10px 24px; border-radius: 12px; border: 1px solid var(--glass-border); cursor: pointer; transition: 0.3s; font-weight: 600; display: flex; align-items: center; gap: 8px; font-family: inherit; color: white; }
         .btn-primary { background: var(--accent); color: white; box-shadow: 0 8px 16px-4px var(--accent-glow); }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 20px -4px var(--accent-glow); }
 
@@ -365,6 +382,8 @@ class WebServer {
                 <div id="db-path" style="font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono';">Unknown</div>
             </div>
             <div style="display: flex; gap: 12px;">
+                <input type="file" id="db-upload-input" style="display:none" accept=".db,.sqlite,.sqlite3" onchange="handleFileUpload(this)">
+                <button class="btn" style="background:rgba(255,255,255,0.05);" onclick="document.getElementById('db-upload-input').click()"><i class="fas fa-upload"></i> Upload .db</button>
                 <button class="btn" style="background:transparent;" onclick="exportData('csv')"><i class="fas fa-file-csv"></i> Export</button>
                 <button class="btn btn-primary" onclick="runQuery()"><i class="fas fa-play"></i> Execute Query</button>
             </div>
@@ -444,6 +463,39 @@ class WebServer {
 
             renderTables(allTables);
             if (editor) editor.setOption('hintOptions', { tables: metadata });
+        }
+
+        async function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (!confirm('Are you sure you want to replace the current database with ' + file.name + '?')) {
+                input.value = '';
+                return;
+            }
+
+            const loader = document.createElement('div');
+            loader.style = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(10px); z-index:10000; display:flex; justify-content:center; align-items:center;';
+            loader.innerHTML = '<div style="text-align:center;"><i class="fas fa-spinner fa-spin fa-3x"></i><p style="margin-top:20px; font-weight:600;">Uploading Database...</p></div>';
+            document.body.appendChild(loader);
+
+            try {
+                const res = await fetch('/api/database/upload', {
+                    method: 'POST',
+                    body: await file.arrayBuffer()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Upload failed: ' + data.error);
+                    document.body.removeChild(loader);
+                }
+            } catch (e) {
+                alert('Upload error: ' + e);
+                document.body.removeChild(loader);
+            }
+            input.value = '';
         }
 
         function initEditor() {
