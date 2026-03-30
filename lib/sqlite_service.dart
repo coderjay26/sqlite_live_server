@@ -1,7 +1,6 @@
 import 'dart:math';
 
 import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart';
 import 'dart:io';
 
@@ -10,7 +9,6 @@ class SQLiteService {
   String? _databasePath;
 
   Future<void> initDatabase(String dbName) async {
-    Directory appDir = await getApplicationDocumentsDirectory();
     _databasePath = join(await getDatabasesPath(), dbName);
   }
 
@@ -227,6 +225,24 @@ class SQLiteService {
         'tableStats': [],
         'error': e.toString(),
       };
+    }
+  }
+
+  // Get all metadata for autocomplete (tables and columns)
+  Future<Map<String, List<String>>> getAllDatabaseMetadata() async {
+    try {
+      final tables = await getTables();
+      final metadata = <String, List<String>>{};
+      
+      for (final table in tables) {
+        final schema = await getTableSchema(table);
+        metadata[table] = schema.map((col) => col['name'] as String).toList();
+      }
+      
+      return metadata;
+    } catch (e) {
+      print('Error getting all metadata: $e');
+      return {};
     }
   }
 
